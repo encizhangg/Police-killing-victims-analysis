@@ -166,9 +166,7 @@ Overall, while there is evidence of same-race concentration, the strength of thi
 The data covers January through early June 2015, with only 2 entries in June. Within this window, March has the highest count at 114 incidents, followed by April (96), January (90), February (84), and May (81). Gunshot is overwhelmingly the dominant cause of death across all months, accounting for about 88% of all incidents. Taser-related deaths show a slight increase in March and April (8 each) compared to earlier months, and deaths in custody remain rare. Overall, the monthly totals fluctuate slightly, but no clear seasonal trend exists for any cause of death within this five-month window.
 ```{r}
 pk_raw <- read.csv("police_killings.csv")
-pk_raw$month <- factor(pk_raw$month, 
-                       levels = c("January","February","March","April","May","June"), 
-                       ordered = TRUE)
+pk_raw$month <- factor(pk_raw$month, levels = c("January","February","March","April","May","June"), ordered = TRUE)
 
 q1_table <- pk_raw %>%
   count(month, cause) %>%
