@@ -259,12 +259,8 @@ SHOW AT LEAST 2 TABLES OR FIGURES BELOW THAT EXPLORE ANSWERS FOR THE QUESTIONS Y
 
 ```{r}
 # Do certain socioeconomic factors amplify the effect of low income on police killings? In other words, is low income alone insufficient, but becomes more impactful when combined with factors such as high poverty, high unemployment, or low education?
-library(tidyverse)
-library(janitor)
-library(scales)
 options(device = "png")
-# 1. Read and clean data
-df <- read.csv("police_killings.csv", fileEncoding = "latin1") %>%
+df_interaction <- read.csv("police_killings.csv", fileEncoding = "latin1") %>%
   clean_names() %>%
   mutate(
     comp_income = as.numeric(comp_income),
@@ -273,8 +269,7 @@ df <- read.csv("police_killings.csv", fileEncoding = "latin1") %>%
     college = as.numeric(college)
   )
 
-# 2. Create income groups
-df <- df %>%
+df_interaction <- df_interaction %>%
   mutate(
     income_group = case_when(
       comp_income < 0.8 ~ "Low income",
@@ -288,7 +283,6 @@ df <- df %>%
     )
   )
 
-# 3. General function for overall analysis
 overall_factor_analysis <- function(data, var, var_label) {
   
   df_sub <- data %>%
@@ -356,15 +350,14 @@ overall_factor_analysis <- function(data, var, var_label) {
   ))
 }
 
-# 4. Run for multiple factors
 
-res_pov <- overall_factor_analysis(df, "pov", "poverty")
+res_pov <- overall_factor_analysis(df_interaction, "pov", "poverty")
 print(res_pov$plot)
 
-res_urate <- overall_factor_analysis(df, "urate", "unemployment")
+res_urate <- overall_factor_analysis(df_interaction, "urate", "unemployment")
 print(res_urate$plot)
 
-res_college <- overall_factor_analysis(df, "college", "education")
+res_college <- overall_factor_analysis(df_interaction, "college", "education")
 print(res_college$plot)
 ```
 
