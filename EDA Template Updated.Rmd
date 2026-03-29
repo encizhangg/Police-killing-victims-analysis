@@ -1,0 +1,332 @@
+---
+title: "Exploratory Data Analysis"
+author: "STOR 320.(01 OR 02) Group PLACE_GROUP_NUMBER_HERE (Ex: STOR 320.01 Group 12)"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(knitr)
+library(tidyverse)
+library(janitor)
+library(funModeling)
+library(skimr)
+library(readr)
+library(lubridate)
+library(DataExplorer)
+library(dlookr)
+library(gt)
+library(corrr)
+options(scipen = 999)  
+
+# Import Data Below
+# read_csv()
+df <- read.csv("police_killings.csv")
+```
+
+
+```{r}
+df <- df |>
+    clean_names() |> 
+    mutate(across(where(is.character), ~ str_squish(.))) |> 
+    mutate(across(where(is.character),
+                ~ na_if(.x, ""))) |> 
+    mutate(across(where(is.character),
+                ~ case_when(
+                  .x %in% c("NA", "N/A", "null", "NULL", "?", "unknown", "Unknown", "-", " - ", " -", "- ") ~ NA_character_,
+                  TRUE ~ .x
+                )))
+df <- df |>
+  mutate(age = as.integer(age)) |>
+  mutate(gender = as.factor(gender)) |>
+  mutate(raceethnicity = as.factor(raceethnicity)) |>
+  mutate(month = as.factor(month)) |>
+  mutate(state = as.factor(state)) |>
+  mutate(share_white = as.numeric(share_white)) |>
+  mutate(share_black = as.numeric(share_black)) |>
+  mutate(share_hispanic = as.numeric(share_hispanic)) |>
+  mutate(p_income = as.numeric(p_income)) |>
+  mutate(pov = as.numeric(pov))
+df <- df |> 
+    mutate(
+        armed = case_when(
+            armed %in% c("No") ~ "No",
+            TRUE ~ "Yes"
+        ))
+df <- df |> 
+    mutate(
+        cause = case_when(
+            cause %in% c("Gunshot") ~ "Gunshot",
+            TRUE ~ "Other"
+        ))
+df <- df |> 
+  mutate(cause = as.factor(cause)) |>
+  mutate(armed = as.factor(armed))
+```
+
+```{r}
+glimpse(df)
+```
+
+```{r}
+df |>
+  count(cause, armed) |>
+  group_by(cause) |>
+  mutate(percent = n / sum(n)) |>
+  ungroup() |>
+  select(cause, armed, percent) |>
+  pivot_wider(
+    names_from = armed,
+    values_from = percent,
+    values_fill = 0
+  ) |>
+  gt() |>
+  cols_label(
+    cause = "Cause",
+    No = "Unarmed",
+    Yes = "Armed"
+  ) |>
+  fmt_percent(columns = c(No, Yes), decimals = 1) |>
+  tab_header(
+    title = "Police killings by cause and armed status",
+    subtitle = "Percent within each cause"
+  )
+```
+
+
+```{r}
+df |>
+  count(cause, armed) |>
+  group_by(cause) |>
+  mutate(percent = n / sum(n)) |>
+  pivot_wider(
+    names_from = armed,
+    values_from = percent,
+    values_fill = 0,
+
+  ) |>
+  gt() |>
+    tab_header(
+    title = "Police killings by cause and armed status",
+    subtitle = "Counts of cases by category") |>
+    cols_label(
+        Yes = "Armed",
+        No = "Unarmed"
+    )
+```
+
+
+```{r}
+df |>
+  count(cause, armed) |>
+  pivot_wider(
+    names_from = armed,
+    values_from = n,
+    values_fill = 0,
+
+  ) |>
+  gt() |>
+    tab_header(
+    title = "Police killings by cause and armed status",
+    subtitle = "Counts of cases by category") |>
+    cols_label(
+        Yes = "Armed",
+        No = "Unarmed"
+    )
+```
+
+
+```{r}
+df |> 
+    select(cause, armed) |> 
+    group_by(cause) %>%
+  summarise(
+    group_count = n(),
+    Armed = 
+    mean_charge = mean(charges, na.rm = TRUE),
+    median_charge = median(charges, na.rm = TRUE),
+    .groups = "drop"
+  ) |> 
+    gt()
+```
+
+
+
+# Creator: FIRSTNAME LASTNAME
+
+### Q1: WRITE_QUESTION_HERE
+
+```{r}
+#
+```
+
+### Q2: WRITE_QUESTION_HERE
+
+```{r}
+#
+```
+
+# Interpreter: FIRSTNAME LASTNAME
+
+### Q1: WRITE_QUESTION_HERE
+
+```{r}
+#
+```
+
+### Q2: WRITE_QUESTION_HERE
+
+```{r}
+#
+```
+
+# Orator: FIRSTNAME LASTNAME
+
+### Q1: WRITE_QUESTION_HERE
+
+```{r}
+#
+```
+
+### Q2: WRITE_QUESTION_HERE
+
+```{r}
+#
+
+```
+
+# Deliverer: Michael Bernier
+
+### Q1: Are the victims of police killings more likely to be in tracts with a lower income than the general county?
+
+```{r}
+
+```
+
+
+```{r}
+dfq1 <- df %>%
+  filter(!is.na(comp_income),
+         comp_income > 0) |>
+  mutate(income_group = if_else(comp_income < 1,"Below county median", "At/above county median")) |>
+  count(income_group) |>
+  mutate(percent = n / sum(n))
+  ggplot(dfq1, aes(x = income_group, y = percent)) +
+  geom_col(fill = "deepskyblue1") +
+  geom_text(aes(label = scales::percent(percent, accuracy = 0.1)), vjust = -0.3, size = 5) +
+  labs(
+    title = "Police killing victims by tract income relative to the county",
+    x = NULL,
+    y = "Percent of Killings"
+  ) +
+  ylim(0, 1) +
+  theme_minimal()
+  
+dfq1
+```
+
+### Q2: Can we predict whether a victim was armed based on socioeconomic factors?
+
+```{r}
+armedpredict <- df[, c("armed", "college", "urate", "h_income", "pov")]
+armedpredict <- na.omit(armedpredict)
+armedpredict <- armedpredict |>
+  mutate(
+    armed_yn = ifelse(armed == "No", 0, 1)
+  )
+model <- glm(armed_yn ~ college + urate + h_income + pov,
+             data = armedpredict,
+             family = binomial)
+armedpredict$predicted <- predict(model, type = "response")
+
+ggplot(armedpredict, aes(x = pov, y = predicted)) +
+  geom_point(alpha = 0.4) +
+  geom_smooth() +
+  labs(
+    title = "Predicted Probability Victim Was Armed",
+    x = "Poverty Rate",
+    y = "Predicted Probability"
+  )
+ggplot(armedpredict, aes(x = college, y = predicted)) +
+  geom_point(alpha = 0.4) +
+  geom_smooth() +
+  labs(
+    title = "Predicted Probability Victim Was Armed",
+    x = "Tract Level College",
+    y = "Predicted Probability"
+  )
+ggplot(armedpredict, aes(x = urate, y = predicted)) +
+  geom_point(alpha = 0.4) +
+  geom_smooth() +
+  labs(
+    title = "Predicted Probability Victim Was Armed",
+    x = "Unemployment Rate",
+    y = "Predicted Probability"
+  )
+ggplot(armedpredict, aes(x = h_income, y = predicted)) +
+  geom_point(alpha = 0.4) +
+  geom_smooth() +
+  labs(
+    title = "Predicted Probability Victim Was Armed",
+    x = "Tract Level Household Income",
+    y = "Predicted Probability"
+  )
+```
+
+# Follow-up Questions
+
+### New Questions Based Off Initial Investigation
+
+- Q1: How do different racial groups differ in the proportion of victims whose race matches the dominant racial group of the tract?
+- Q2: WRITE_QUESTION_HERE
+- Q3: WRITE_QUESTION_HERE 
+- Q4: WRITE_QUESTION_HERE
+
+### Investigation of Follow-up Questions
+
+GIVE WHAT 2 QUESTIONS YOU ATTEMPTED TO INVESTIGATE FURTHER IN COMPLETE SENTENCES (*Example:* Our group decided to investigate Q2 and Q4 in further detail.)
+
+SHOW AT LEAST 2 TABLES OR FIGURES BELOW THAT EXPLORE ANSWERS FOR THE QUESTIONS YOU ARE INVESTIGATING FURTHER.
+
+```{r}
+fu2df <- df |>
+  select(age, raceethnicity, pov, urate, h_income) |>
+  na.omit()
+
+fu2df$raceethnicity <- relevel(factor(fu2df$raceethnicity), ref = "White")
+
+ageracemodel <- lm(age ~ raceethnicity + pov + urate + h_income, data = fu2df)
+summary(ageracemodel)
+
+fu2df|>
+  group_by(raceethnicity) |>
+  summarise(mean_age = mean(age), n = n())
+```
+
+```{r}
+#
+```
+
+# Summary
+
+GIVE A 2 PARAGRAPH SUMMARY. 
+
+PARAGRAPH 1 SHOULD DESCRIBE WHAT YOU LEARNED ABOUT YOUR DATA FROM INVESTIGATING THE INITIAL QUESTIONS. DID YOU FIND ANYTHING UNUSUAL IN YOUR DATA? DID ANYTHING SURPRISE YOU? WHICH OF THE INITIAL QUESTIONS WERE HELPFUL IN LEADING YOU TO MORE QUESTIONS?
+
+PARAGRAPH 2 SHOULD SUMMARIZE WHAT YOU LEARNED FROM INVESTIGATING THE FOLLOW-UP QUESTIONS. WHY ARE THESE FOLLOW-UP QUESTIONS INTERESTING FOR INVESTIGATION? DESCRIBE THE TABLES/FIGURES YOU USED TO EXPLORE ANSWERS TO THESE FOLLOW-UP QUESTIONS? WHAT DID YOU LEARN FROM THE TABLES/FIGURES REGARDING THE FOLLOW-UP QUESTIONS YOU PROPOSED?
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
