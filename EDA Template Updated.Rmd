@@ -99,20 +99,53 @@ glimpse(df)
 #
 ```
 
-# Orator: FIRSTNAME LASTNAME
+# Orator: Sunita Singh
 
-### Q1: WRITE_QUESTION_HERE
+### Q1: How does the poverty(pov) rate correlate to police killings? 
 
-```{r}
-#
-```
-
-### Q2: WRITE_QUESTION_HERE
 
 ```{r}
-#
+library(ggplot2)
+library(dplyr)
+
+df$pov <- as.numeric(as.character(df$pov))
+df_clean <- df %>% filter(!is.na(pov))
+
+ggplot(df_clean, aes(x = pov)) +
+  geom_histogram(binwidth = 5, fill = "darkblue", color = "white") +
+  geom_vline(aes(xintercept = mean(pov)), color = "red", linetype = "dashed", size = 1) +
+  annotate("text", x = mean(df_clean$pov) + 12, y = 60, 
+           label = paste("Average Poverty Rate:", round(mean(df_clean$pov), 1), "%"), color = "red") +
+  labs(title = "Distribution of Poverty Rates in Areas of Police Killings",
+       subtitle = "Red line indicates the mean poverty rate of all incidents",
+       x = "Poverty Rate (%)",
+       y = "Number of Incidents") +
+  theme_minimal()
+```
+This histogram shows the distribution of census tract poverty rates for all police killing incidents in the dataset. The distribution is right-skewed, with the bulk of incidents concentrated in tracts with poverty rates between 5% and 25%, and a long tail extending out to nearly 80%. The peak is in the 10–15% bin with roughly 90 incidents. The mean poverty rate across all incidents is 21.1%, which is notably higher than the national poverty rate of approximately 14–15% in 2015. This suggests that police killings disproportionately occur in higher-poverty neighborhoods. However, the skew also means that a substantial number of incidents still happen in relatively low-poverty tracts; the relationship is a tendency, not an absolute rule. The few extreme outliers above 60% poverty represent incidents in deeply impoverished communities that are rare but present in the data.
+
+
+### Q2: How does the employment rate(urate) relate to the rate of police killings? 
+
+
+```{r}
+df$urate <- as.numeric(as.character(df$urate))
+df_clean <- df %>% filter(!is.na(urate))
+
+# Visualization: Histogram of Unemployment Rates
+ggplot(df_clean, aes(x = urate)) +
+  geom_histogram(binwidth = 0.02, fill = "darkorange", color = "white") +
+  geom_vline(aes(xintercept = mean(urate)), color = "blue", linetype = "dashed", size = 1) +
+  annotate("text", x = mean(df_clean$urate) + 0.1, y = 50, 
+           label = paste("Mean Unemployment:", round(mean(df_clean$urate) * 100, 1), "%"), color = "blue") +
+  labs(title = "Police Killings by Local Unemployment Rate",
+       subtitle = "Data represents the unemployment rate of the census tract for each incident",
+       x = "Unemployment Rate (as a decimal)",
+       y = "Number of Killings") +
+  theme_minimal()
 
 ```
+If the "Mean Unemployment" (the blue dashed line) is significantly higher than the national average at the time (which was roughly 5.3% in 2015), it indicates that police killings are not randomly distributed. They are clustered in neighborhoods facing higher economic hardship. The histogram helps demonstrate whether police-involved shootings are a phenomenon tied to the economic health of a community. If the bars are tallest in the 10%–20% unemployment range, it highlights that the "rate of police killings" is linked to the socio-economic status of the location.
 
 # Deliverer: Michael Bernier
 
@@ -191,6 +224,7 @@ ggplot(armedpredict, aes(x = h_income, y = predicted)) +
     y = "Predicted Probability"
   )
 ```
+
 # Additional Questions
 
 ### Q1: How does the cause of death vary across the victims' status of being armed?
@@ -232,10 +266,45 @@ df |>
     gt()
 ```
 
-### Q2: WRITE_QUESTION_HERE
+### Q2: How do police killings vary across different ages?  (age groups - 0-18, 19-29, 30-39, 40-49, 50-59, 60+)
+
 
 ```{r}
-#
+
+df <- read.csv("police_killings.csv", stringsAsFactors = FALSE)
+df_clean <- df %>%
+  mutate(age = as.numeric(age)) %>%
+  filter(!is.na(age))
+ # make groups 
+df_clean <- df_clean %>%
+  mutate(age_group = case_when(
+    age <= 18 ~ "0-18",
+    age >= 19 & age <= 29 ~ "19-29",
+    age >= 30 & age <= 39 ~ "30-39",
+    age >= 40 & age <= 49 ~ "40-49",
+    age >= 50 & age <= 59 ~ "50-59",
+    age >= 60 ~ "60+",
+    TRUE ~ "Unknown"
+  ))
+
+summary_table <- df_clean %>%
+  count(age_group) %>%
+  mutate(percentage = round((n / sum(n)) * 100, 1))
+ggplot(summary_table, aes(x = age_group, y = percentage, fill = age_group)) +
+  
+  geom_bar(stat = "identity", show.legend = TRUE) +   
+  
+  geom_text(aes(label = paste0(percentage, "%")), 
+            vjust = -0.5,                             
+            fontface = "bold") +                      
+  
+  labs(title = "Police Killings by Age Groups",
+       x = "Age Group",
+       y = "Percentage (%)") +
+  
+  theme_minimal()
+
+print(summary_table)
 
 ```
 
