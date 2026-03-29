@@ -323,6 +323,8 @@ dfq1 <- df %>%
   
 dfq1
 ```
+This figure analyzes the amount of police victims whose household income is either equal to or above the county median household income or lower than the county median household income. It is evident from the graph, that the majority of killings involved victims whose household income was lower than their county's median income. This suggests that people from relatively lower-income neighborhoods (when compared to the rest of the county) are disproportionately represented among victims.
+
 
 ### Q2: Can we predict whether a victim was armed based on socioeconomic factors?
 
@@ -513,10 +515,10 @@ ggplot(pk_age, aes(x = raceethnicity, y = age_num, fill = raceethnicity)) +
 Follow Up Question 4:
 
 ```{r}
-plot_data <- pk_q2 %>%
+plot_data <- df_q2 %>%
+  mutate(match = ifelse(raceethnicity == dominant_race, 1, 0)) %>%
   group_by(raceethnicity) %>%
   summarise(match_proportion = mean(match, na.rm = TRUE))
-
 ggplot(plot_data, aes(x = raceethnicity, y = match_proportion, fill = raceethnicity)) +
   geom_col() +
   geom_text(aes(label = round(match_proportion, 2)), vjust = -0.5) +
@@ -526,7 +528,6 @@ ggplot(plot_data, aes(x = raceethnicity, y = match_proportion, fill = raceethnic
     y = "Match Proportion"
   ) +
   theme_minimal()
-
 ```
 
 
