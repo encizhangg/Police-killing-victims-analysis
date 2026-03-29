@@ -107,15 +107,12 @@ ggplot(df_q1, aes(x = college, y = urate, color = h_income)) +
 
 ### Q2: Is there an association between victim race and the dominant racial group in the tract where the police killing occurred?
 
+
 ```{r}
 #Is there an association between victim race and the dominant racial group in the tract where the police killing occurred?
 
+
 df_q2 <- df %>%
-  mutate(
-    share_white = as.numeric(share_white),
-    share_black = as.numeric(share_black),
-    share_hispanic = as.numeric(share_hispanic)
-  ) %>%
   filter(raceethnicity %in% c("White", "Black", "Hispanic/Latino")) %>%
   mutate(
     dominant_race = case_when(
@@ -368,14 +365,7 @@ SHOW AT LEAST 2 TABLES OR FIGURES BELOW THAT EXPLORE ANSWERS FOR THE QUESTIONS Y
 # In other words, is low income alone insufficient, but becomes more impactful
 # when combined with factors such as high poverty, high unemployment, or low education?
 
-df_interaction <- read.csv("police_killings.csv", fileEncoding = "latin1") %>%
-  clean_names() %>%
-  mutate(
-    comp_income = as.numeric(comp_income),
-    pov = as.numeric(pov),
-    urate = as.numeric(urate),
-    college = as.numeric(college)
-  ) %>%
+df_interaction <- df %>%
   mutate(
     income_group = case_when(
       comp_income < 0.8 ~ "Low income",
