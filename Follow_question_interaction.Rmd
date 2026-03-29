@@ -1,0 +1,121 @@
+---
+title: "Follow-up question"
+author: "Jinlong"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```         
+```
+
+> 
+
+```{r}
+options(device = "png")
+df_interaction <- read.csv("police_killings.csv", fileEncoding = "latin1") %>%
+  clean_names() %>%
+  mutate(
+    comp_income = as.numeric(comp_income),
+    pov = as.numeric(pov),
+    urate = as.numeric(urate),
+    college = as.numeric(college)
+  )
+
+df_interaction <- df_interaction %>%
+  mutate(
+    income_group = case_when(
+      comp_income < 0.8 ~ "Low income",
+      comp_income <= 1.2 ~ "Medium income",
+      comp_income > 1.2 ~ "High income",
+      TRUE ~ NA_character_
+    ),
+    income_group = factor(
+      income_group,
+      levels = c("Low income", "Medium income", "High income")
+    )
+  )
+
+overall_factor_analysis <- function(data, var, var_label) {
+  
+  df_sub <- data %>%
+    filter(!is.na(income_group), !is.na(.data[[var]]))
+  
+  cut1 <- quantile(df_sub[[var]], 1/3, na.rm = TRUE)
+  cut2 <- quantile(df_sub[[var]], 2/3, na.rm = TRUE)
+  
+  df_sub <- df_sub %>%
+    mutate(
+      factor_group = case_when(
+        .data[[var]] < cut1 ~ paste("Low", var_label),
+        .data[[var]] < cut2 ~ paste("Medium", var_label),
+        TRUE ~ paste("High", var_label)
+      ),
+      factor_group = factor(
+        factor_group,
+        levels = c(
+          paste("Low", var_label),
+          paste("Medium", var_label),
+          paste("High", var_label)
+        )
+      )
+    )
+  
+  overall_table <- df_sub %>%
+    count(income_group, factor_group) %>%
+    mutate(
+      pct_total = round(n / sum(n) * 100, 1)
+    ) %>%
+    arrange(desc(n))
+  
+  count_table <- table(df_sub$income_group, df_sub$factor_group)
+  chi_result <- chisq.test(count_table)
+  
+  p_label <- ifelse(
+    chi_result$p.value < 0.001,
+    "p < 0.001",
+    paste0("p = ", round(chi_result$p.value, 4))
+  )
+  
+  p <- ggplot(overall_table, aes(x = factor_group, y = income_group, fill = pct_total)) +
+    geom_tile(color = "white", linewidth = 0.8) +
+    geom_text(aes(label = paste0(pct_total, "%")), size = 5) +
+    scale_fill_gradient(low = "lightblue", high = "darkblue") +
+    labs(
+      title = paste("Overall distribution: Income x", var_label, "(", p_label, ")"),
+      subtitle = "Share of total incidents",
+      x = paste(var_label, "group"),
+      y = "Income group",
+      fill = "% of total"
+    ) +
+    theme_minimal(base_size = 14)
+  
+  cat("\n===== Overall Table:", var_label, "=====\n")
+  print(overall_table)
+  
+  cat("\n===== Chi-square Test:", var_label, "=====\n")
+  print(chi_result)
+  
+  return(list(
+    overall_table = overall_table,
+    chi_result = chi_result,
+    plot = p
+  ))
+}
+
+# 4. Run for multiple factors
+
+res_pov <- overall_factor_analysis(df_interaction, "pov", "poverty")
+print(res_pov$plot)
+
+res_urate <- overall_factor_analysis(df_interaction, "urate", "unemployment")
+print(res_urate$plot)
+
+res_college <- overall_factor_analysis(df_interaction, "college", "education")
+print(res_college$plot)
+```
+
+The results provide strong evidence that certain socioeconomic factors amplify the effect of low income on police killings. Chi-square tests show highly significant associations between income and poverty, unemployment, and education (all p-values \< 0.001), indicating that these factors are not independent. More importantly, the overall distribution reveals that low income alone is insufficient to explain the concentration of incidents. For example, low-income tracts with high poverty account for 26.9% of all police killings, compared to only 3.4% for low-income tracts with low poverty. Similar amplification patterns are observed for unemployment (20.6% vs. 5.2%) and education (21.9% in low-income, low-education tracts vs. only 0.6% in high-income, low-education tracts). These large disparities demonstrate that police killings are most concentrated where multiple disadvantages co-occur. Therefore, the findings suggest a clear compounding effect: low income becomes significantly more impactful when combined with high poverty, high unemployment, or low education, rather than operating as a standalone factor
