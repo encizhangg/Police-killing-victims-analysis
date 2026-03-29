@@ -25,7 +25,6 @@ options(scipen = 999)
 df <- read.csv("police_killings.csv")
 ```
 
-
 ```{r}
 df <- df |>
     clean_names() |> 
@@ -69,11 +68,9 @@ df <- df |>
 glimpse(df)
 ```
 
+# Creator: Jinlong Li
 
-
-# Creator: FIRSTNAME LASTNAME
-
-### Q1: WRITE_QUESTION_HERE
+## Q1: WRITE_QUESTION_HERE
 
 ```{r}
 #
@@ -121,7 +118,6 @@ glimpse(df)
 ```{r}
 
 ```
-
 
 ```{r}
 dfq1 <- df %>%
@@ -191,6 +187,7 @@ ggplot(armedpredict, aes(x = h_income, y = predicted)) +
     y = "Predicted Probability"
   )
 ```
+
 # Additional Questions
 
 ### Q1: How does the cause of death vary across the victims' status of being armed?
@@ -239,17 +236,17 @@ df |>
 
 ```
 
-
-
 # Follow-up Questions
 
 ### New Questions Based Off Initial Investigation
 
-- Q1: How do different racial groups differ in the proportion of victims whose race matches the dominant racial group of the tract?
-- Q2: Do certain socioeconomic factors amplify the effect of low income on police killings? In other words, is low income alone insufficient, but becomes more impactful when combined with factors such as high poverty, high unemployment, or low education?
+-   Q1: How do different racial groups differ in the proportion of victims whose race matches the dominant racial group of the tract?
 
-- Q3: WRITE_QUESTION_HERE 
-- Q4: WRITE_QUESTION_HERE
+-   Q2: Do certain socioeconomic factors amplify the effect of low income on police killings? In other words, is low income alone insufficient, but becomes more impactful when combined with factors such as high poverty, high unemployment, or low education?
+
+-   Q3: WRITE_QUESTION_HERE
+
+-   Q4: WRITE_QUESTION_HERE
 
 ### Investigation of Follow-up Questions
 
@@ -259,12 +256,9 @@ SHOW AT LEAST 2 TABLES OR FIGURES BELOW THAT EXPLORE ANSWERS FOR THE QUESTIONS Y
 
 ```{r}
 # Do certain socioeconomic factors amplify the effect of low income on police killings? In other words, is low income alone insufficient, but becomes more impactful when combined with factors such as high poverty, high unemployment, or low education?
-library(tidyverse)
-library(janitor)
-library(scales)
+
 options(device = "png")
-# 1. Read and clean data
-df <- read.csv("police_killings.csv", fileEncoding = "latin1") %>%
+df_interaction <- read.csv("police_killings.csv", fileEncoding = "latin1") %>%
   clean_names() %>%
   mutate(
     comp_income = as.numeric(comp_income),
@@ -272,9 +266,7 @@ df <- read.csv("police_killings.csv", fileEncoding = "latin1") %>%
     urate = as.numeric(urate),
     college = as.numeric(college)
   )
-
-# 2. Create income groups
-df <- df %>%
+df_interaction <- df_interaction %>%
   mutate(
     income_group = case_when(
       comp_income < 0.8 ~ "Low income",
@@ -288,7 +280,6 @@ df <- df %>%
     )
   )
 
-# 3. General function for overall analysis
 overall_factor_analysis <- function(data, var, var_label) {
   
   df_sub <- data %>%
@@ -356,15 +347,14 @@ overall_factor_analysis <- function(data, var, var_label) {
   ))
 }
 
-# 4. Run for multiple factors
 
-res_pov <- overall_factor_analysis(df, "pov", "poverty")
+res_pov <- overall_factor_analysis(df_interaction, "pov", "poverty")
 print(res_pov$plot)
 
-res_urate <- overall_factor_analysis(df, "urate", "unemployment")
+res_urate <- overall_factor_analysis(df_interaction, "urate", "unemployment")
 print(res_urate$plot)
 
-res_college <- overall_factor_analysis(df, "college", "education")
+res_college <- overall_factor_analysis(df_interaction, "college", "education")
 print(res_college$plot)
 ```
 
@@ -374,23 +364,8 @@ print(res_college$plot)
 
 # Summary
 
-GIVE A 2 PARAGRAPH SUMMARY. 
+GIVE A 2 PARAGRAPH SUMMARY.
 
 PARAGRAPH 1 SHOULD DESCRIBE WHAT YOU LEARNED ABOUT YOUR DATA FROM INVESTIGATING THE INITIAL QUESTIONS. DID YOU FIND ANYTHING UNUSUAL IN YOUR DATA? DID ANYTHING SURPRISE YOU? WHICH OF THE INITIAL QUESTIONS WERE HELPFUL IN LEADING YOU TO MORE QUESTIONS?
 
 PARAGRAPH 2 SHOULD SUMMARIZE WHAT YOU LEARNED FROM INVESTIGATING THE FOLLOW-UP QUESTIONS. WHY ARE THESE FOLLOW-UP QUESTIONS INTERESTING FOR INVESTIGATION? DESCRIBE THE TABLES/FIGURES YOU USED TO EXPLORE ANSWERS TO THESE FOLLOW-UP QUESTIONS? WHAT DID YOU LEARN FROM THE TABLES/FIGURES REGARDING THE FOLLOW-UP QUESTIONS YOU PROPOSED?
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
