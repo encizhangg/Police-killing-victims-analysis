@@ -375,9 +375,10 @@ GIVE WHAT 2 QUESTIONS YOU ATTEMPTED TO INVESTIGATE FURTHER IN COMPLETE SENTENCES
 SHOW AT LEAST 2 TABLES OR FIGURES BELOW THAT EXPLORE ANSWERS FOR THE QUESTIONS YOU ARE INVESTIGATING FURTHER.
 
 ```{r}
-# Do certain socioeconomic factors amplify the effect of low income on police killings? In other words, is low income alone insufficient, but becomes more impactful when combined with factors such as high poverty, high unemployment, or low education?
+# Do certain socioeconomic factors amplify the effect of low income on police killings?
+# In other words, is low income alone insufficient, but becomes more impactful
+# when combined with factors such as high poverty, high unemployment, or low education?
 
-options(device = "png")
 df_interaction <- read.csv("police_killings.csv", fileEncoding = "latin1") %>%
   clean_names() %>%
   mutate(
@@ -385,18 +386,13 @@ df_interaction <- read.csv("police_killings.csv", fileEncoding = "latin1") %>%
     pov = as.numeric(pov),
     urate = as.numeric(urate),
     college = as.numeric(college)
-  )
-df_interaction <- df_interaction %>%
+  ) %>%
   mutate(
     income_group = case_when(
       comp_income < 0.8 ~ "Low income",
       comp_income <= 1.2 ~ "Medium income",
       comp_income > 1.2 ~ "High income",
       TRUE ~ NA_character_
-    ),
-    income_group = factor(
-      income_group,
-      levels = c("Low income", "Medium income", "High income")
     )
   )
 
@@ -405,6 +401,7 @@ overall_factor_analysis <- function(data, var, var_label) {
   df_sub <- data %>%
     filter(!is.na(income_group), !is.na(.data[[var]]))
   
+
   cut1 <- quantile(df_sub[[var]], 1/3, na.rm = TRUE)
   cut2 <- quantile(df_sub[[var]], 2/3, na.rm = TRUE)
   
@@ -414,17 +411,10 @@ overall_factor_analysis <- function(data, var, var_label) {
         .data[[var]] < cut1 ~ paste("Low", var_label),
         .data[[var]] < cut2 ~ paste("Medium", var_label),
         TRUE ~ paste("High", var_label)
-      ),
-      factor_group = factor(
-        factor_group,
-        levels = c(
-          paste("Low", var_label),
-          paste("Medium", var_label),
-          paste("High", var_label)
-        )
       )
     )
   
+
   overall_table <- df_sub %>%
     count(income_group, factor_group) %>%
     mutate(
@@ -432,27 +422,9 @@ overall_factor_analysis <- function(data, var, var_label) {
     ) %>%
     arrange(desc(n))
   
+
   count_table <- table(df_sub$income_group, df_sub$factor_group)
   chi_result <- chisq.test(count_table)
-  
-  p_label <- ifelse(
-    chi_result$p.value < 0.001,
-    "p < 0.001",
-    paste0("p = ", round(chi_result$p.value, 4))
-  )
-  
-  p <- ggplot(overall_table, aes(x = factor_group, y = income_group, fill = pct_total)) +
-    geom_tile(color = "white", linewidth = 0.8) +
-    geom_text(aes(label = paste0(pct_total, "%")), size = 5) +
-    scale_fill_gradient(low = "lightblue", high = "darkblue") +
-    labs(
-      title = paste("Overall distribution: Income x", var_label, "(", p_label, ")"),
-      subtitle = "Share of total incidents",
-      x = paste(var_label, "group"),
-      y = "Income group",
-      fill = "% of total"
-    ) +
-    theme_minimal(base_size = 14)
   
   cat("\n===== Overall Table:", var_label, "=====\n")
   print(overall_table)
@@ -460,22 +432,16 @@ overall_factor_analysis <- function(data, var, var_label) {
   cat("\n===== Chi-square Test:", var_label, "=====\n")
   print(chi_result)
   
-  return(list(
+  invisible(list(
     overall_table = overall_table,
-    chi_result = chi_result,
-    plot = p
+    chi_result = chi_result
   ))
 }
 
 
 res_pov <- overall_factor_analysis(df_interaction, "pov", "poverty")
-print(res_pov$plot)
-
 res_urate <- overall_factor_analysis(df_interaction, "urate", "unemployment")
-print(res_urate$plot)
-
 res_college <- overall_factor_analysis(df_interaction, "college", "education")
-print(res_college$plot)
 ```
 
 ```{r}
