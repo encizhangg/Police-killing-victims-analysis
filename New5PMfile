@@ -1,0 +1,531 @@
+---
+title: "Exploratory Data Analysis"
+author: "STOR 320.(01 OR 02) Group PLACE_GROUP_NUMBER_HERE (Ex: STOR 320.01 Group 12)"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output: html_document
+---
+
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(knitr)
+library(tidyverse)
+library(janitor)
+library(funModeling)
+library(skimr)
+library(readr)
+library(lubridate)
+library(DataExplorer)
+library(dlookr)
+library(gt)
+library(corrr)
+options(scipen = 999)  
+
+# Import Data Below
+# read_csv()
+df <- read.csv("police_killings.csv")
+```
+
+```{r}
+df <- df |>
+    clean_names() |> 
+    mutate(across(where(is.character), ~ str_squish(.))) |> 
+    mutate(across(where(is.character),
+                ~ na_if(.x, ""))) |> 
+    mutate(across(where(is.character),
+                ~ case_when(
+                  .x %in% c("NA", "N/A", "null", "NULL", "?", "unknown", "Unknown", "-", " - ", " -", "- ") ~ NA_character_,
+                  TRUE ~ .x
+                )))
+df <- df |>
+    mutate(across(where(is.numeric),
+                ~ case_when(
+                  .x %in% c("NA", "N/A", "null", "NULL", "?", "unknown", "Unknown", "-", " - ", " -", "- ") ~ NA_integer_,
+                  TRUE ~ .x
+                )))
+df <- df |>
+  mutate(
+    age = as.integer(age),
+    gender = as.factor(gender),
+    raceethnicity = as.factor(raceethnicity),
+    month = as.factor(month),
+    state = as.factor(state),
+    share_white = as.numeric(share_white),
+    share_black = as.numeric(share_black),
+    comp_income = as.numeric(comp_income),
+    share_hispanic = as.numeric(share_hispanic),
+    p_income = as.numeric(p_income),
+    pov = as.numeric(pov),
+    urate = as.numeric(urate),
+    college = as.numeric(college)
+  )
+
+df <- df |> 
+    mutate(
+        armed = case_when(
+            armed %in% c("No") ~ "No",
+            TRUE ~ "Yes"
+        ))
+df <- df |> 
+    mutate(
+        cause = case_when(
+            cause %in% c("Gunshot") ~ "Gunshot",
+            TRUE ~ "Other"
+        ))
+df <- df |> 
+  mutate(cause = as.factor(cause)) |>
+  mutate(armed = as.factor(armed))
+```
+
+
+# Creator: Jinlong Li
+
+## Q1: What is the relationship between income, unemployment rate, and education level in tracts where police killings occur?
+
+```{r}
+#What is the relationship between income, unemployment rate, and education level in tracts where police killings occur?
+
+df_q1 <- df %>%
+  select(h_income, urate, college) %>%
+  drop_na()
+
+summary(df_q1)
+cor(df_q1)
+
+ggplot(df_q1, aes(x = college, y = urate, color = h_income)) +
+  geom_point(alpha = 0.6) +
+  geom_smooth(method = "lm", se = FALSE, color = "black") +
+  labs(
+    title = "Relationship between income, unemployment, and education",
+    x = "College attainment (%)",
+    y = "Unemployment rate (%)",
+    color = "Household income"
+  ) +
+  theme_minimal()
+
+
+```
+The scatter plot reveals clear relationships among income, education, and unemployment in tracts where police killings occur. In particular, there is a strong negative relationship between college attainment and unemployment rate, indicating that areas with higher levels of education tend to have lower unemployment.
+In addition, higher-income tracts are generally associated with higher education levels and lower unemployment, as shown by the color gradient. Conversely, tracts with lower income tend to cluster in regions with lower education and higher unemployment rates.
+
+
+### Q2: Is there an association between victim race and the dominant racial group in the tract where the police killing occurred?
+
+```{r}
+#Is there an association between victim race and the dominant racial group in the tract where the police killing occurred?
+
+df_q2 <- df %>%
+  filter(raceethnicity %in% c("White", "Black", "Hispanic/Latino")) %>%
+  mutate(
+    dominant_race = case_when(
+      share_white >= share_black & share_white >= share_hispanic ~ "White",
+      share_black >= share_white & share_black >= share_hispanic ~ "Black",
+      share_hispanic >= share_white & share_hispanic >= share_black ~ "Hispanic/Latino",
+      TRUE ~ NA_character_
+    )
+  )
+
+heatmap_data <- df_q2 %>%
+  filter(!is.na(dominant_race)) %>%
+  count(raceethnicity, dominant_race)
+
+ggplot(heatmap_data, aes(x = dominant_race, y = raceethnicity, fill = n)) +
+  geom_tile() +
+  geom_text(aes(label = n)) +
+  scale_fill_gradient(low = "white", high = "steelblue") +
+  labs(
+    title = "Victim Race vs Dominant Race in Tract",
+    x = "Dominant Race in Tract",
+    y = "Victim Race"
+  ) +
+  theme_minimal()
+
+```
+
+A strong diagonal pattern is observed, indicating that victims are often from the same racial group as the dominant population in their area.
+The heatmap shows a clear association between victim race and the dominant racial group of the tract.
+This pattern is most pronounced for White victims, who are overwhelmingly found in White-dominant tracts (202 cases). Hispanic/Latino victims also show a strong concentration in Hispanic-dominant areas (43 cases), though a noticeable portion appears in White-dominant tracts (23 cases). In contrast, Black victims display a more dispersed pattern, appearing in both Black-dominant (56 cases) and White-dominant tracts (57 cases).
+Overall, while there is evidence of same-race concentration, the strength of this pattern differs across racial groups, with White victims showing the strongest alignment and Black victims showing the weakest.
+
+
+# Interpreter: Enci Zhang
+
+### Q1: Does the classification of death by police show a seasonal trend or vary significantly by the month of the year?
+The data covers January through early June 2015, with only 2 cases in June, so a full 12-month seasonal analysis is not possible. Within this window, March has the highest count at 114 incidents, followed by April (96), January (90), February (84), and May (81). Gunshot is overwhelmingly the dominant cause across all months, accounting for about 88% of all incidents. Taser-related deaths show a slight increase in March and April (8 each) compared to earlier months, while deaths in custody remain rare and relatively flat. Overall, the monthly totals fluctuate slightly, but no clear seasonal trend exists for any cause of death within this five-month window.
+```{r}
+pk_raw <- read.csv("police_killings.csv")
+pk_raw$month <- factor(pk_raw$month, 
+                       levels = c("January","February","March","April","May","June"), 
+                       ordered = TRUE)
+
+#month & cause of Death
+q1_table <- pk_raw %>%
+  count(month, cause) %>%
+  pivot_wider(names_from = cause, values_from = n, values_fill = 0) %>%
+  mutate(Total = rowSums(across(where(is.numeric))))
+
+kable(q1_table, caption = "Table: Number of Police Killings by Month and Cause of Death (Jan–Jun 2015)")
+
+#plot
+ggplot(pk_raw, aes(x = month, fill = cause)) +
+  geom_bar(color = "black", linewidth = 0.3) +
+  labs(
+    title = "Police Killings by Month and Cause of Death (Jan–Jun 2015)",
+    x = "Month",
+    y = "Number of Incidents",
+    fill = "Cause of Death"
+  ) +
+  scale_fill_brewer(palette = "Set2") +
+  theme_minimal(base_size = 13) +
+  theme(
+    plot.title = element_text(face = "bold"),
+    legend.position = "right"
+  )
+```
+
+### Q2: Do certain law enforcement agencies appear more frequently in incidents occurring in low-income tracts?
+To investigate this question, comp_income (the ratio of tract household income to county household income) is used to classify each census tract. Low (comp_income < 0.75), Medium (0.75–1.00), and High (> 1.00). Agencies with at least 3 incidents are tested. Several agencies show a disproportionate share of incidents in low-income tracts. Oklahoma City Police Department stands out: 4 of its 5 incidents (80%) occurred in tracts where household income was less than 75% of the county average, with a mean comp_income of only 0.74. Phoenix Police Department follows at 75% low-income (mean 0.56). These percentages are well above the dataset-wide baseline of 35.1%. On the other end, agencies like the Austin Police Department, New Jersey State Police, San Francisco Police Department, and US Border Patrol have zero incidents in low-income tracts. This suggests that the economic context of policing incidents varies substantially by agency, even within the same state (e.g., LAPD at 40% low-income vs. SFPD at 0%). However, agencies with few incidents (3–5) are subject to high variance, so these patterns should be interpreted carefully.
+
+```{r}
+df <- df %>%
+  mutate(income_level = case_when(
+    comp_income < 0.75 ~ "Low",
+    comp_income <= 1.00 ~ "Medium",
+    comp_income > 1.00 ~ "High",
+    TRUE ~ NA_character_
+  ))
+
+#a with 3 or more incidents
+agency_counts <- df %>%
+  count(lawenforcementagency, name = "total_incidents") %>%
+  filter(total_incidents >= 3)
+
+q2_table <- df %>%
+  filter(lawenforcementagency %in% agency_counts$lawenforcementagency) %>%
+  group_by(lawenforcementagency) %>%
+  summarise(
+    State          = first(state),
+    Total          = n(),
+    Low_Income_N   = sum(income_level == "Low", na.rm = TRUE),
+    Pct_Low_Income = round(100 * Low_Income_N / Total, 1),
+    Mean_Comp_Inc  = round(mean(comp_income, na.rm = TRUE), 3),
+    .groups = "drop"
+  ) %>%
+  arrange(desc(Pct_Low_Income))
+
+kable(q2_table,
+      col.names = c("Agency", "State", "Total Incidents",
+                     "Low-Income Tracts (N)", "% Low-Income",
+                     "Mean comp_income"),
+      caption = "Table: Agency-Level Breakdown by Census Tract Income Level (Agencies with 3+ Incidents)")
+
+top12 <- df %>%
+  count(lawenforcementagency, sort = TRUE) %>%
+  slice_head(n = 12) %>%
+  pull(lawenforcementagency)
+
+df %>%
+  filter(lawenforcementagency %in% top12, !is.na(income_level)) %>%
+  mutate(
+    income_level = factor(income_level, levels = c("Low","Medium","High")),
+    lawenforcementagency = factor(lawenforcementagency,
+                                  levels = rev(names(sort(table(lawenforcementagency)))))
+  ) %>%
+  ggplot(aes(y = lawenforcementagency, fill = income_level)) +
+  geom_bar(color = "black", linewidth = 0.3) +
+  scale_fill_manual(
+    values = c("Low" = "#d73027", "Medium" = "#fee08b", "High" = "#1a9850"),
+    labels = c("Low (<75% of county)", "Medium (75–100%)", "High (>100%)")
+  ) +
+  labs(
+    title = "Income Level of Census Tracts for Top 12 Law Enforcement Agencies",
+    x = "Number of Incidents",
+    y = "",
+    fill = "Tract Income\n(vs County Avg)"
+  ) +
+  theme_minimal(base_size = 13) +
+  theme(plot.title = element_text(face = "bold"))
+```
+
+
+# Orator: Sunita Singh
+
+### Q1: How does the poverty(pov) rate correlate to police killings? 
+
+
+```{r}
+df_clean <- df %>% filter(!is.na(pov))
+
+ggplot(df_clean, aes(x = pov)) +
+  geom_histogram(binwidth = 5, fill = "darkblue", color = "white") +
+  geom_vline(aes(xintercept = mean(pov)), color = "red", linetype = "dashed", size = 1) +
+  annotate("text", x = mean(df_clean$pov) + 12, y = 60, 
+           label = paste("Average Poverty Rate:", round(mean(df_clean$pov), 1), "%"), color = "red") +
+  labs(title = "Distribution of Poverty Rates in Areas of Police Killings",
+       subtitle = "Red line indicates the mean poverty rate of all incidents",
+       x = "Poverty Rate (%)",
+       y = "Number of Incidents") +
+  theme_minimal()
+```
+This histogram shows the distribution of census tract poverty rates for all police killing incidents in the dataset. The distribution is right-skewed, with the bulk of incidents concentrated in tracts with poverty rates between 5% and 25%, and a long tail extending out to nearly 80%. The peak is in the 10–15% bin with roughly 90 incidents. The mean poverty rate across all incidents is 21.1%, which is notably higher than the national poverty rate of approximately 14–15% in 2015. This suggests that police killings disproportionately occur in higher-poverty neighborhoods. However, the skew also means that a substantial number of incidents still happen in relatively low-poverty tracts; the relationship is a tendency, not an absolute rule. The few extreme outliers above 60% poverty represent incidents in deeply impoverished communities that are rare but present in the data.
+
+
+### Q2: How does the employment rate(urate) relate to the rate of police killings? 
+
+
+```{r}
+df_clean <- df %>% filter(!is.na(urate))
+
+ggplot(df_clean, aes(x = urate)) +
+  geom_histogram(binwidth = 0.02, fill = "darkorange", color = "white") +
+  geom_vline(aes(xintercept = mean(urate)), color = "blue", linetype = "dashed", size = 1) +
+  annotate("text", x = mean(df_clean$urate) + 0.1, y = 50, 
+           label = paste("Mean Unemployment:", round(mean(df_clean$urate) * 100, 1), "%"), color = "blue") +
+  labs(title = "Police Killings by Local Unemployment Rate",
+       subtitle = "Data represents the unemployment rate of the census tract for each incident",
+       x = "Unemployment Rate (as a decimal)",
+       y = "Number of Killings") +
+  theme_minimal()
+
+```
+If the "Mean Unemployment" (the blue dashed line) is significantly higher than the national average at the time (which was roughly 5.3% in 2015), it indicates that police killings are not randomly distributed. They are clustered in neighborhoods facing higher economic hardship. The histogram helps demonstrate whether police-involved shootings are a phenomenon tied to the economic health of a community. If the bars are tallest in the 10%–20% unemployment range, it highlights that the "rate of police killings" is linked to the socio-economic status of the location.
+
+# Deliverer: Michael Bernier
+
+### Q1: Are the victims of police killings more likely to be in tracts with a lower income than the general county?
+
+```{r}
+dfq1 <- df %>%
+  filter(!is.na(comp_income),
+         comp_income > 0) |>
+  mutate(income_group = if_else(comp_income < 1,"Below county median", "At/above county median")) |>
+  count(income_group) |>
+  mutate(percent = n / sum(n))
+  ggplot(dfq1, aes(x = income_group, y = percent)) +
+  geom_col(fill = "deepskyblue1") +
+  geom_text(aes(label = scales::percent(percent, accuracy = 0.1)), vjust = -0.3, size = 5) +
+  labs(
+    title = "Police killing victims by tract income relative to the county",
+    x = NULL,
+    y = "Percent of Killings"
+  ) +
+  ylim(0, 1) +
+  theme_minimal()
+  
+dfq1
+```
+
+### Q2: Can we predict whether a victim was armed based on socioeconomic factors?
+
+```{r}
+armedpredict <- df[, c("armed", "college", "urate", "h_income", "pov")]
+armedpredict <- na.omit(armedpredict)
+armedpredict <- armedpredict |>
+  mutate(
+    armed_yn = ifelse(armed == "No", 0, 1)
+  )
+model <- glm(armed_yn ~ college + urate + h_income + pov,
+             data = armedpredict,
+             family = binomial)
+armedpredict$predicted <- predict(model, type = "response")
+
+ggplot(armedpredict, aes(x = pov, y = predicted)) +
+  geom_point(alpha = 0.4) +
+  geom_smooth() +
+  labs(
+    title = "Predicted Probability Victim Was Armed",
+    x = "Poverty Rate",
+    y = "Predicted Probability"
+  )
+ggplot(armedpredict, aes(x = college, y = predicted)) +
+  geom_point(alpha = 0.4) +
+  geom_smooth() +
+  labs(
+    title = "Predicted Probability Victim Was Armed",
+    x = "Tract Level College",
+    y = "Predicted Probability"
+  )
+ggplot(armedpredict, aes(x = urate, y = predicted)) +
+  geom_point(alpha = 0.4) +
+  geom_smooth() +
+  labs(
+    title = "Predicted Probability Victim Was Armed",
+    x = "Unemployment Rate",
+    y = "Predicted Probability"
+  )
+ggplot(armedpredict, aes(x = h_income, y = predicted)) +
+  geom_point(alpha = 0.4) +
+  geom_smooth() +
+  labs(
+    title = "Predicted Probability Victim Was Armed",
+    x = "Tract Level Household Income",
+    y = "Predicted Probability"
+  )
+```
+
+# Additional Questions
+
+### Q1: How does the cause of death vary across the victims' status of being armed?
+
+```{r}
+df |>
+  count(cause, armed) |>
+  group_by(cause) |>
+  mutate(percent = n / sum(n)) |>
+  ungroup() |>
+  select(cause, armed, percent) |>
+  pivot_wider(
+    names_from = armed,
+    values_from = percent,
+    values_fill = 0
+  ) |>
+  gt() |>
+  cols_label(
+    cause = "Cause",
+    No = "Unarmed",
+    Yes = "Armed"
+  ) |>
+  fmt_percent(columns = c(No, Yes), decimals = 1) |>
+  tab_header(
+    title = "Police killings by cause and armed status",
+    subtitle = "Percent within each cause"
+  )
+```
+
+### Q2: How do police killings vary across different ages?  (age groups - 0-18, 19-29, 30-39, 40-49, 50-59, 60+)
+
+
+```{r}
+
+df <- read.csv("police_killings.csv", stringsAsFactors = FALSE)
+df_clean <- df %>%
+  mutate(age = as.numeric(age)) %>%
+  filter(!is.na(age))
+ # make groups 
+df_clean <- df_clean %>%
+  mutate(age_group = case_when(
+    age <= 18 ~ "0-18",
+    age >= 19 & age <= 29 ~ "19-29",
+    age >= 30 & age <= 39 ~ "30-39",
+    age >= 40 & age <= 49 ~ "40-49",
+    age >= 50 & age <= 59 ~ "50-59",
+    age >= 60 ~ "60+",
+    TRUE ~ "Unknown"
+  ))
+
+summary_table <- df_clean %>%
+  count(age_group) %>%
+  mutate(percentage = round((n / sum(n)) * 100, 1))
+ggplot(summary_table, aes(x = age_group, y = percentage, fill = age_group)) +
+  
+  geom_bar(stat = "identity", show.legend = TRUE) +   
+  
+  geom_text(aes(label = paste0(percentage, "%")), 
+            vjust = -0.5,                             
+            fontface = "bold") +                      
+  
+  labs(title = "Police Killings by Age Groups",
+       x = "Age Group",
+       y = "Percentage (%)") +
+  
+  theme_minimal()
+
+print(summary_table)
+
+```
+
+# Follow-up Questions
+
+### New Questions Based Off Initial Investigation
+
+-   Q1: Does the victim's age differ significantly across racial groups? Is there an age gap after controlling for the tract’s poverty, unemployment and income?
+
+
+-   Q2: Do certain socioeconomic factors amplify the effect of low income on police killings? In other words, is low income alone insufficient, but becomes more impactful when combined with factors such as high poverty, high unemployment, or low education?
+
+-   Q3: Are victims in the lowest income quintile tracts significantly different (in race, age, armed status) compared to those in the highest quartile?
+
+
+-   Q4: How do different racial groups differ in the proportion of victims whose race matches the dominant racial group of the tract?
+
+### Investigation of Follow-up Questions
+
+GIVE WHAT 2 QUESTIONS YOU ATTEMPTED TO INVESTIGATE FURTHER IN COMPLETE SENTENCES (*Example:* Our group decided to investigate Q2 and Q4 in further detail.)
+
+Our group decided to investigate question 1 and question 4 in further detail
+
+SHOW AT LEAST 2 TABLES OR FIGURES BELOW THAT EXPLORE ANSWERS FOR THE QUESTIONS YOU ARE INVESTIGATING FURTHER.
+
+Follow Up Question 1: 
+
+```{r}
+df$age_num <- as.numeric(df$age)
+df$pov <- as.numeric(df$pov)
+
+pk_age <- df %>%
+  filter(raceethnicity %in% c("White", "Black", "Hispanic/Latino"),
+         !is.na(age_num), !is.na(pov))
+
+#poverty tertiles
+pov_cuts <- quantile(pk_age$pov, probs = c(1/3, 2/3), na.rm = TRUE)
+
+pk_age <- pk_age %>%
+  mutate(pov_group = case_when(
+    pov <= pov_cuts[1] ~ "Low Poverty",
+    pov <= pov_cuts[2] ~ "Medium Poverty",
+    pov > pov_cuts[2]  ~ "High Poverty"
+  ),
+  pov_group = factor(pov_group, levels = c("Low Poverty", "Medium Poverty", "High Poverty")))
+
+age_summary <- pk_age %>%
+  group_by(raceethnicity, pov_group) %>%
+  summarise(n = n(),
+            Mean_Age = round(mean(age_num), 1),
+            Median_Age = median(age_num),
+            .groups = "drop")
+
+kable(age_summary,
+      caption = "Victim Age by Race and Tract Poverty Level")
+
+ggplot(pk_age, aes(x = raceethnicity, y = age_num, fill = raceethnicity)) +
+  geom_boxplot(color = "black", outlier.shape = 16, outlier.size = 1.5) +
+  stat_summary(fun = mean, geom = "point", shape = 18, size = 3, color = "gold") +
+  facet_wrap(~ pov_group) +
+  scale_fill_manual(values = c("Black" = "#d6604d", "Hispanic/Latino" = "#66c2a5", "White" = "#4393c3")) +
+  labs(
+    title = "Victim Age by Race, Faceted by Tract Poverty Level",
+    x = "", y = "Age"
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(plot.title = element_text(face = "bold"), legend.position = "none")
+```
+
+
+Follow Up Question 4:
+
+```{r}
+plot_data <- pk_q2 %>%
+  group_by(raceethnicity) %>%
+  summarise(match_proportion = mean(match, na.rm = TRUE))
+
+ggplot(plot_data, aes(x = raceethnicity, y = match_proportion, fill = raceethnicity)) +
+  geom_col() +
+  geom_text(aes(label = round(match_proportion, 2)), vjust = -0.5) +
+  labs(
+    title = "Proportion of Same-Race Match by Victim Race",
+    x = "Victim Race",
+    y = "Match Proportion"
+  ) +
+  theme_minimal()
+
+```
+
+
+# Summary
+
+GIVE A 2 PARAGRAPH SUMMARY.
+
+PARAGRAPH 1 SHOULD DESCRIBE WHAT YOU LEARNED ABOUT YOUR DATA FROM INVESTIGATING THE INITIAL QUESTIONS. DID YOU FIND ANYTHING UNUSUAL IN YOUR DATA? DID ANYTHING SURPRISE YOU? WHICH OF THE INITIAL QUESTIONS WERE HELPFUL IN LEADING YOU TO MORE QUESTIONS?
+
+PARAGRAPH 2 SHOULD SUMMARIZE WHAT YOU LEARNED FROM INVESTIGATING THE FOLLOW-UP QUESTIONS. WHY ARE THESE FOLLOW-UP QUESTIONS INTERESTING FOR INVESTIGATION? DESCRIBE THE TABLES/FIGURES YOU USED TO EXPLORE ANSWERS TO THESE FOLLOW-UP QUESTIONS? WHAT DID YOU LEARN FROM THE TABLES/FIGURES REGARDING THE FOLLOW-UP QUESTIONS YOU PROPOSED?
