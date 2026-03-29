@@ -5,6 +5,14 @@ date: "`r format(Sys.time(), '%B %d, %Y')`"
 output: html_document
 ---
 
+Statement of the Business Problem: 
+
+
+Data Quality Report for Numerical and Categorical Features:
+
+
+Data Issues and Outline of proposed Handling Techniques: 
+Upon opening, the dataset was largely clean with minimal issues. The key issue identified was the classification of many of the variables, with many variables being classified falsely. For example, age was classified as a character when it should have been an integer and gender was classified as a character when it should have been a factor. In the end, we mutated 12 variables. This included mutating age to an integer, gender to a factor, raceethnicity to a factor, month to a factor, state to a factor, cause to a factor, armed to a factor, share_white to numeric, share_black to numeric, share_hispanic to numeric, p_income to numeric and pov to numeric. More generally, we cleaned the names of the variables, used str_squish and ensured all the NA’s were uniform. Lastly, changed the classification of two variables, armed and cause. For armed, we classified all “No” responses as “No” and all else to “Yes”. In essence, this meant that if a victim was armed with anything at all, then their armed classification would be “Yes”. Similarly, for cause, we classified all “Gunshot” responses as “Gunshot” and all else as “Other”. 
 
 
 ```{r setup, include=FALSE}
