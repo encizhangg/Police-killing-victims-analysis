@@ -136,12 +136,12 @@ ggplot(heatmap_data, aes(x = dominant_race, y = raceethnicity, fill = n)) +
 
 ```
 
-# Interpreter: FIRSTNAME LASTNAME
+# Interpreter: Enci Zhang
 
 ### Q1: WRITE_QUESTION_HERE
 
 ```{r}
-#
+
 ```
 
 ### Q2: WRITE_QUESTION_HERE
