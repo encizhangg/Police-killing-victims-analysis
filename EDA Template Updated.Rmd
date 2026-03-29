@@ -372,6 +372,11 @@ print(summary_table)
 
 GIVE WHAT 2 QUESTIONS YOU ATTEMPTED TO INVESTIGATE FURTHER IN COMPLETE SENTENCES (*Example:* Our group decided to investigate Q2 and Q4 in further detail.)
 
+
+We chose to further investigate follow-up question 4, “Does the victim's age differ significantly across racial groups? Is there an age gap after controlling for the tract’s poverty, unemployment, and income?” In social science, oftentimes, individuals who do not “match” the dominant demographic of their community are often viewed as more suspicious in the eyes of the law. Using data science, we can determine if this hypothesis is true if an analysis suggests that being a minority is a risk factor for an incident with the police. 
+
+Also, we chose to further investigate follow-up question 2,  “Do certain socioeconomic factors amplify the effect of low income on police killings? In other words, is low income alone insufficient, but becomes more impactful when combined with factors such as high poverty, high unemployment, or low education?” In sociology, the principle of cumulative disadvantage means that the hardships experienced by those in impoverished communities multiply to create a higher likelihood for incidents. For example, if a community is low-income and high-unemployment and low-eduction, it might result in more stress on those in the communities, creating a higher risk for police interventions and incidents. If you only look at income, you might conclude that "poverty causes police killings." But if the data shows that killings only spike when low income and high unemployment are present, then the real issue might be the lack of jobs or labor market exclusion, not just the amount of money in people's pockets. This leads to much more accurate and fair conclusions.
+
 SHOW AT LEAST 2 TABLES OR FIGURES BELOW THAT EXPLORE ANSWERS FOR THE QUESTIONS YOU ARE INVESTIGATING FURTHER.
 
 ```{r}
