@@ -1,0 +1,446 @@
+---
+title: "Exploratory Data Analysis"
+author: "STOR 320.(01 OR 02) Group PLACE_GROUP_NUMBER_HERE (Ex: STOR 320.01 Group 12)"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(knitr)
+library(tidyverse)
+library(janitor)
+library(funModeling)
+library(skimr)
+library(readr)
+library(lubridate)
+library(DataExplorer)
+library(dlookr)
+library(gt)
+library(corrr)
+options(scipen = 999)  
+
+# Import Data Below
+# read_csv()
+df <- read.csv("police_killings.csv")
+```
+
+```{r}
+df <- df |>
+    clean_names() |> 
+    mutate(across(where(is.character), ~ str_squish(.))) |> 
+    mutate(across(where(is.character),
+                ~ na_if(.x, ""))) |> 
+    mutate(across(where(is.character),
+                ~ case_when(
+                  .x %in% c("NA", "N/A", "null", "NULL", "?", "unknown", "Unknown", "-", " - ", " -", "- ") ~ NA_character_,
+                  TRUE ~ .x
+                )))
+df <- df |>
+    mutate(across(where(is.numeric),
+                ~ case_when(
+                  .x %in% c("NA", "N/A", "null", "NULL", "?", "unknown", "Unknown", "-", " - ", " -", "- ") ~ NA_integer_,
+                  TRUE ~ .x
+                )))
+df <- df |>
+  mutate(
+    age = as.integer(age),
+    gender = as.factor(gender),
+    raceethnicity = as.factor(raceethnicity),
+    month = as.factor(month),
+    state = as.factor(state),
+    share_white = as.numeric(share_white),
+    share_black = as.numeric(share_black),
+    comp_income = as.numeric(comp_income),
+    share_hispanic = as.numeric(share_hispanic),
+    p_income = as.numeric(p_income),
+    pov = as.numeric(pov),
+    urate = as.numeric(urate),
+    college = as.numeric(college)
+  )
+
+df <- df |> 
+    mutate(
+        armed = case_when(
+            armed %in% c("No") ~ "No",
+            TRUE ~ "Yes"
+        ))
+df <- df |> 
+    mutate(
+        cause = case_when(
+            cause %in% c("Gunshot") ~ "Gunshot",
+            TRUE ~ "Other"
+        ))
+df <- df |> 
+  mutate(cause = as.factor(cause)) |>
+  mutate(armed = as.factor(armed))
+```
+
+
+# Creator: Jinlong Li
+
+## Q1: What is the relationship between income, unemployment rate, and education level in tracts where police killings occur?
+
+```{r}
+#What is the relationship between income, unemployment rate, and education level in tracts where police killings occur?
+
+df_q1 <- df %>%
+  select(h_income, urate, college) %>%
+  drop_na()
+
+summary(df_q1)
+cor(df_q1)
+
+ggplot(df_q1, aes(x = college, y = urate, color = h_income)) +
+  geom_point(alpha = 0.6) +
+  geom_smooth(method = "lm", se = FALSE, color = "black") +
+  labs(
+    title = "Relationship between income, unemployment, and education",
+    x = "College attainment (%)",
+    y = "Unemployment rate (%)",
+    color = "Household income"
+  ) +
+  theme_minimal()
+
+
+```
+
+### Q2: Is there an association between victim race and the dominant racial group in the tract where the police killing occurred?
+
+```{r}
+#Is there an association between victim race and the dominant racial group in the tract where the police killing occurred?
+
+df_q2 <- df %>%
+  mutate(
+    share_white = as.numeric(share_white),
+    share_black = as.numeric(share_black),
+    share_hispanic = as.numeric(share_hispanic)
+  ) %>%
+  filter(raceethnicity %in% c("White", "Black", "Hispanic/Latino")) %>%
+  mutate(
+    dominant_race = case_when(
+      share_white >= share_black & share_white >= share_hispanic ~ "White",
+      share_black >= share_white & share_black >= share_hispanic ~ "Black",
+      share_hispanic >= share_white & share_hispanic >= share_black ~ "Hispanic/Latino",
+      TRUE ~ NA_character_
+    )
+  )
+
+heatmap_data <- df_q2 %>%
+  filter(!is.na(dominant_race)) %>%
+  count(raceethnicity, dominant_race)
+
+ggplot(heatmap_data, aes(x = dominant_race, y = raceethnicity, fill = n)) +
+  geom_tile() +
+  geom_text(aes(label = n)) +
+  scale_fill_gradient(low = "white", high = "steelblue") +
+  labs(
+    title = "Victim Race vs Dominant Race in Tract",
+    x = "Dominant Race in Tract",
+    y = "Victim Race"
+  ) +
+  theme_minimal()
+
+```
+
+# Interpreter: FIRSTNAME LASTNAME
+
+### Q1: WRITE_QUESTION_HERE
+
+```{r}
+#
+```
+
+### Q2: WRITE_QUESTION_HERE
+
+```{r}
+#
+```
+
+# Orator: Sunita Singh
+
+### Q1: How does the poverty(pov) rate correlate to police killings? 
+
+
+```{r}
+df$pov <- as.numeric(as.character(df$pov))
+df_clean <- df %>% filter(!is.na(pov))
+
+ggplot(df_clean, aes(x = pov)) +
+  geom_histogram(binwidth = 5, fill = "darkblue", color = "white") +
+  geom_vline(aes(xintercept = mean(pov)), color = "red", linetype = "dashed", size = 1) +
+  annotate("text", x = mean(df_clean$pov) + 12, y = 60, 
+           label = paste("Average Poverty Rate:", round(mean(df_clean$pov), 1), "%"), color = "red") +
+  labs(title = "Distribution of Poverty Rates in Areas of Police Killings",
+       subtitle = "Red line indicates the mean poverty rate of all incidents",
+       x = "Poverty Rate (%)",
+       y = "Number of Incidents") +
+  theme_minimal()
+```
+This histogram shows the distribution of census tract poverty rates for all police killing incidents in the dataset. The distribution is right-skewed, with the bulk of incidents concentrated in tracts with poverty rates between 5% and 25%, and a long tail extending out to nearly 80%. The peak is in the 10–15% bin with roughly 90 incidents. The mean poverty rate across all incidents is 21.1%, which is notably higher than the national poverty rate of approximately 14–15% in 2015. This suggests that police killings disproportionately occur in higher-poverty neighborhoods. However, the skew also means that a substantial number of incidents still happen in relatively low-poverty tracts; the relationship is a tendency, not an absolute rule. The few extreme outliers above 60% poverty represent incidents in deeply impoverished communities that are rare but present in the data.
+
+
+### Q2: How does the employment rate(urate) relate to the rate of police killings? 
+
+
+```{r}
+df$urate <- as.numeric(as.character(df$urate))
+df_clean <- df %>% filter(!is.na(urate))
+
+ggplot(df_clean, aes(x = urate)) +
+  geom_histogram(binwidth = 0.02, fill = "darkorange", color = "white") +
+  geom_vline(aes(xintercept = mean(urate)), color = "blue", linetype = "dashed", size = 1) +
+  annotate("text", x = mean(df_clean$urate) + 0.1, y = 50, 
+           label = paste("Mean Unemployment:", round(mean(df_clean$urate) * 100, 1), "%"), color = "blue") +
+  labs(title = "Police Killings by Local Unemployment Rate",
+       subtitle = "Data represents the unemployment rate of the census tract for each incident",
+       x = "Unemployment Rate (as a decimal)",
+       y = "Number of Killings") +
+  theme_minimal()
+
+```
+If the "Mean Unemployment" (the blue dashed line) is significantly higher than the national average at the time (which was roughly 5.3% in 2015), it indicates that police killings are not randomly distributed. They are clustered in neighborhoods facing higher economic hardship. The histogram helps demonstrate whether police-involved shootings are a phenomenon tied to the economic health of a community. If the bars are tallest in the 10%–20% unemployment range, it highlights that the "rate of police killings" is linked to the socio-economic status of the location.
+
+# Deliverer: Michael Bernier
+
+### Q1: Are the victims of police killings more likely to be in tracts with a lower income than the general county?
+
+```{r}
+dfq1 <- df %>%
+  filter(!is.na(comp_income),
+         comp_income > 0) |>
+  mutate(income_group = if_else(comp_income < 1,"Below county median", "At/above county median")) |>
+  count(income_group) |>
+  mutate(percent = n / sum(n))
+  ggplot(dfq1, aes(x = income_group, y = percent)) +
+  geom_col(fill = "deepskyblue1") +
+  geom_text(aes(label = scales::percent(percent, accuracy = 0.1)), vjust = -0.3, size = 5) +
+  labs(
+    title = "Police killing victims by tract income relative to the county",
+    x = NULL,
+    y = "Percent of Killings"
+  ) +
+  ylim(0, 1) +
+  theme_minimal()
+  
+dfq1
+```
+
+### Q2: Can we predict whether a victim was armed based on socioeconomic factors?
+
+```{r}
+armedpredict <- df[, c("armed", "college", "urate", "h_income", "pov")]
+armedpredict <- na.omit(armedpredict)
+armedpredict <- armedpredict |>
+  mutate(
+    armed_yn = ifelse(armed == "No", 0, 1)
+  )
+model <- glm(armed_yn ~ college + urate + h_income + pov,
+             data = armedpredict,
+             family = binomial)
+armedpredict$predicted <- predict(model, type = "response")
+
+ggplot(armedpredict, aes(x = pov, y = predicted)) +
+  geom_point(alpha = 0.4) +
+  geom_smooth() +
+  labs(
+    title = "Predicted Probability Victim Was Armed",
+    x = "Poverty Rate",
+    y = "Predicted Probability"
+  )
+ggplot(armedpredict, aes(x = college, y = predicted)) +
+  geom_point(alpha = 0.4) +
+  geom_smooth() +
+  labs(
+    title = "Predicted Probability Victim Was Armed",
+    x = "Tract Level College",
+    y = "Predicted Probability"
+  )
+ggplot(armedpredict, aes(x = urate, y = predicted)) +
+  geom_point(alpha = 0.4) +
+  geom_smooth() +
+  labs(
+    title = "Predicted Probability Victim Was Armed",
+    x = "Unemployment Rate",
+    y = "Predicted Probability"
+  )
+ggplot(armedpredict, aes(x = h_income, y = predicted)) +
+  geom_point(alpha = 0.4) +
+  geom_smooth() +
+  labs(
+    title = "Predicted Probability Victim Was Armed",
+    x = "Tract Level Household Income",
+    y = "Predicted Probability"
+  )
+```
+
+# Additional Questions
+
+### Q1: How does the cause of death vary across the victims' status of being armed?
+
+```{r}
+df |>
+  count(cause, armed) |>
+  group_by(cause) |>
+  mutate(percent = n / sum(n)) |>
+  ungroup() |>
+  select(cause, armed, percent) |>
+  pivot_wider(
+    names_from = armed,
+    values_from = percent,
+    values_fill = 0
+  ) |>
+  gt() |>
+  cols_label(
+    cause = "Cause",
+    No = "Unarmed",
+    Yes = "Armed"
+  ) |>
+  fmt_percent(columns = c(No, Yes), decimals = 1) |>
+  tab_header(
+    title = "Police killings by cause and armed status",
+    subtitle = "Percent within each cause"
+  )
+```
+
+### Q2: How do police killings vary across different ages?  (age groups - 0-18, 19-29, 30-39, 40-49, 50-59, 60+)
+
+
+```{r}
+
+df <- read.csv("police_killings.csv", stringsAsFactors = FALSE)
+df_clean <- df %>%
+  mutate(age = as.numeric(age)) %>%
+  filter(!is.na(age))
+ # make groups 
+df_clean <- df_clean %>%
+  mutate(age_group = case_when(
+    age <= 18 ~ "0-18",
+    age >= 19 & age <= 29 ~ "19-29",
+    age >= 30 & age <= 39 ~ "30-39",
+    age >= 40 & age <= 49 ~ "40-49",
+    age >= 50 & age <= 59 ~ "50-59",
+    age >= 60 ~ "60+",
+    TRUE ~ "Unknown"
+  ))
+
+summary_table <- df_clean %>%
+  count(age_group) %>%
+  mutate(percentage = round((n / sum(n)) * 100, 1))
+ggplot(summary_table, aes(x = age_group, y = percentage, fill = age_group)) +
+  
+  geom_bar(stat = "identity", show.legend = TRUE) +   
+  
+  geom_text(aes(label = paste0(percentage, "%")), 
+            vjust = -0.5,                             
+            fontface = "bold") +                      
+  
+  labs(title = "Police Killings by Age Groups",
+       x = "Age Group",
+       y = "Percentage (%)") +
+  
+  theme_minimal()
+
+print(summary_table)
+
+```
+
+# Follow-up Questions
+
+### New Questions Based Off Initial Investigation
+
+-   Q1: How do different racial groups differ in the proportion of victims whose race matches the dominant racial group of the tract?
+
+-   Q2: Do certain socioeconomic factors amplify the effect of low income on police killings? In other words, is low income alone insufficient, but becomes more impactful when combined with factors such as high poverty, high unemployment, or low education?
+
+-   Q3: WRITE_QUESTION_HERE
+
+-   Q4: WRITE_QUESTION_HERE
+
+### Investigation of Follow-up Questions
+
+GIVE WHAT 2 QUESTIONS YOU ATTEMPTED TO INVESTIGATE FURTHER IN COMPLETE SENTENCES (*Example:* Our group decided to investigate Q2 and Q4 in further detail.)
+
+SHOW AT LEAST 2 TABLES OR FIGURES BELOW THAT EXPLORE ANSWERS FOR THE QUESTIONS YOU ARE INVESTIGATING FURTHER.
+
+```{r}
+# Do certain socioeconomic factors amplify the effect of low income on police killings?
+# In other words, is low income alone insufficient, but becomes more impactful
+# when combined with factors such as high poverty, high unemployment, or low education?
+
+df_interaction <- read.csv("police_killings.csv", fileEncoding = "latin1") %>%
+  clean_names() %>%
+  mutate(
+    comp_income = as.numeric(comp_income),
+    pov = as.numeric(pov),
+    urate = as.numeric(urate),
+    college = as.numeric(college)
+  ) %>%
+  mutate(
+    income_group = case_when(
+      comp_income < 0.8 ~ "Low income",
+      comp_income <= 1.2 ~ "Medium income",
+      comp_income > 1.2 ~ "High income",
+      TRUE ~ NA_character_
+    )
+  )
+
+overall_factor_analysis <- function(data, var, var_label) {
+  
+  df_sub <- data %>%
+    filter(!is.na(income_group), !is.na(.data[[var]]))
+  
+
+  cut1 <- quantile(df_sub[[var]], 1/3, na.rm = TRUE)
+  cut2 <- quantile(df_sub[[var]], 2/3, na.rm = TRUE)
+  
+  df_sub <- df_sub %>%
+    mutate(
+      factor_group = case_when(
+        .data[[var]] < cut1 ~ paste("Low", var_label),
+        .data[[var]] < cut2 ~ paste("Medium", var_label),
+        TRUE ~ paste("High", var_label)
+      )
+    )
+  
+
+  overall_table <- df_sub %>%
+    count(income_group, factor_group) %>%
+    mutate(
+      pct_total = round(n / sum(n) * 100, 1)
+    ) %>%
+    arrange(desc(n))
+  
+
+  count_table <- table(df_sub$income_group, df_sub$factor_group)
+  chi_result <- chisq.test(count_table)
+  
+  cat("\n===== Overall Table:", var_label, "=====\n")
+  print(overall_table)
+  
+  cat("\n===== Chi-square Test:", var_label, "=====\n")
+  print(chi_result)
+  
+  invisible(list(
+    overall_table = overall_table,
+    chi_result = chi_result
+  ))
+}
+
+
+res_pov <- overall_factor_analysis(df_interaction, "pov", "poverty")
+res_urate <- overall_factor_analysis(df_interaction, "urate", "unemployment")
+res_college <- overall_factor_analysis(df_interaction, "college", "education")
+```
+
+```{r}
+#
+```
+
+# Summary
+
+GIVE A 2 PARAGRAPH SUMMARY.
+
+PARAGRAPH 1 SHOULD DESCRIBE WHAT YOU LEARNED ABOUT YOUR DATA FROM INVESTIGATING THE INITIAL QUESTIONS. DID YOU FIND ANYTHING UNUSUAL IN YOUR DATA? DID ANYTHING SURPRISE YOU? WHICH OF THE INITIAL QUESTIONS WERE HELPFUL IN LEADING YOU TO MORE QUESTIONS?
+
+PARAGRAPH 2 SHOULD SUMMARIZE WHAT YOU LEARNED FROM INVESTIGATING THE FOLLOW-UP QUESTIONS. WHY ARE THESE FOLLOW-UP QUESTIONS INTERESTING FOR INVESTIGATION? DESCRIBE THE TABLES/FIGURES YOU USED TO EXPLORE ANSWERS TO THESE FOLLOW-UP QUESTIONS? WHAT DID YOU LEARN FROM THE TABLES/FIGURES REGARDING THE FOLLOW-UP QUESTIONS YOU PROPOSED?
