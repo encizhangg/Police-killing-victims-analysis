@@ -457,7 +457,7 @@ Our group decided to investigate question 1 and question 4 in further detail
 
 SHOW AT LEAST 2 TABLES OR FIGURES BELOW THAT EXPLORE ANSWERS FOR THE QUESTIONS YOU ARE INVESTIGATING FURTHER.
 
-Follow Up Question 1: 
+Follow Up Question 2: 
 
 ```{r}
 df$age_num <- as.numeric(df$age)
