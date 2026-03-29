@@ -97,6 +97,11 @@ ggplot(pk_q1, aes(x = college, y = urate, color = h_income)) +
 
 
 ```
+The scatter plot reveals clear relationships among income, education, and unemployment in tracts where police killings occur. In particular, there is a strong negative relationship between college attainment and unemployment rate, indicating that areas with higher levels of education tend to have lower unemployment.
+
+In addition, higher-income tracts are generally associated with higher education levels and lower unemployment, as shown by the color gradient. Conversely, tracts with lower income tend to cluster in regions with lower education and higher unemployment rates.
+
+
 
 ### Q2: Is there an association between victim race and the dominant racial group in the tract where the police killing occurred?
 
@@ -135,6 +140,13 @@ ggplot(heatmap_data, aes(x = dominant_race, y = raceethnicity, fill = n)) +
   theme_minimal()
 
 ```
+ A strong diagonal pattern is observed, indicating that victims are often from the same racial group as the dominant population in their area.
+The heatmap shows a clear association between victim race and the dominant racial group of the tract.
+
+This pattern is most pronounced for White victims, who are overwhelmingly found in White-dominant tracts (202 cases). Hispanic/Latino victims also show a strong concentration in Hispanic-dominant areas (43 cases), though a noticeable portion appears in White-dominant tracts (23 cases). In contrast, Black victims display a more dispersed pattern, appearing in both Black-dominant (56 cases) and White-dominant tracts (57 cases).
+
+Overall, while there is evidence of same-race concentration, the strength of this pattern differs across racial groups, with White victims showing the strongest alignment and Black victims showing the weakest.
+
 
 # Interpreter: Enci Zhang
 
