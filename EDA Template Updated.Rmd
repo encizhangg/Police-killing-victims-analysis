@@ -158,7 +158,6 @@ ggplot(heatmap_data, aes(x = dominant_race, y = raceethnicity, fill = n)) +
 library(ggplot2)
 library(dplyr)
 
-df$pov <- as.numeric(as.character(df$pov))
 df_clean <- df %>% filter(!is.na(pov))
 
 ggplot(df_clean, aes(x = pov)) +
@@ -178,7 +177,7 @@ This histogram shows the distribution of census tract poverty rates for all poli
 ### Q2: How does the employment rate(urate) relate to the rate of police killings?
 
 ```{r}
-df$urate <- as.numeric(as.character(df$urate))
+df$urate <- as.numeric(df$urate)
 df_clean <- df %>% filter(!is.na(urate))
 
 # Visualization: Histogram of Unemployment Rates
@@ -361,6 +360,51 @@ print(summary_table)
 ### New Questions Based Off Initial Investigation
 
 -   Q1: How do different racial groups differ in the proportion of victims whose race matches the dominant racial group of the tract?
+```{r}
+#convert age and pov to numeric
+df$age_num <- as.numeric(df$age)
+df$pov <- as.numeric(df$pov)
+
+#filter
+pk_age <- df %>%
+  filter(raceethnicity %in% c("White", "Black", "Hispanic/Latino"),
+         !is.na(age_num), !is.na(pov))
+
+#poverty tertiles
+pov_cuts <- quantile(pk_age$pov, probs = c(1/3, 2/3), na.rm = TRUE)
+
+pk_age <- pk_age %>%
+  mutate(pov_group = case_when(
+    pov <= pov_cuts[1] ~ "Low Poverty",
+    pov <= pov_cuts[2] ~ "Medium Poverty",
+    pov > pov_cuts[2]  ~ "High Poverty"
+  ),
+  pov_group = factor(pov_group, levels = c("Low Poverty", "Medium Poverty", "High Poverty")))
+
+age_summary <- pk_age %>%
+  group_by(raceethnicity, pov_group) %>%
+  summarise(n = n(),
+            Mean_Age = round(mean(age_num), 1),
+            Median_Age = median(age_num),
+            .groups = "drop")
+
+kable(age_summary,
+      caption = "Victim Age by Race and Tract Poverty Level")
+
+ggplot(pk_age, aes(x = raceethnicity, y = age_num, fill = raceethnicity)) +
+  geom_boxplot(color = "black", outlier.shape = 16, outlier.size = 1.5) +
+  stat_summary(fun = mean, geom = "point", shape = 18, size = 3, color = "gold") +
+  facet_wrap(~ pov_group) +
+  scale_fill_manual(values = c("Black" = "#d6604d", "Hispanic/Latino" = "#66c2a5", "White" = "#4393c3")) +
+  labs(
+    title = "Victim Age by Race, Faceted by Tract Poverty Level",
+    x = "", y = "Age"
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(plot.title = element_text(face = "bold"), legend.position = "none")
+```
+The data reveals a persistent age disparity in police killings across racial groups. White victims average 40.5 years old, while Black victims average 34.0 and Hispanic/Latino victims average 31.6. This gap of roughly 7 to 9 years remains consistent across low, medium, and high-poverty tracts, indicating that neighborhood economic conditions do not account for the difference. The stability of this pattern across poverty levels suggests that race-related factors independent of socioeconomic environment contribute to younger Black and Hispanic individuals being disproportionately represented among those killed by police.
+
 
 -   Q2: Do certain socioeconomic factors amplify the effect of low income on police killings? In other words, is low income alone insufficient, but becomes more impactful when combined with factors such as high poverty, high unemployment, or low education?
 
