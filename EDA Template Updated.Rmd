@@ -158,7 +158,6 @@ ggplot(heatmap_data, aes(x = dominant_race, y = raceethnicity, fill = n)) +
 library(ggplot2)
 library(dplyr)
 
-df$pov <- as.numeric(as.character(df$pov))
 df_clean <- df %>% filter(!is.na(pov))
 
 ggplot(df_clean, aes(x = pov)) +
@@ -178,7 +177,7 @@ This histogram shows the distribution of census tract poverty rates for all poli
 ### Q2: How does the employment rate(urate) relate to the rate of police killings?
 
 ```{r}
-df$urate <- as.numeric(as.character(df$urate))
+df$urate <- as.numeric(df$urate)
 df_clean <- df %>% filter(!is.na(urate))
 
 # Visualization: Histogram of Unemployment Rates
