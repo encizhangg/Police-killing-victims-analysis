@@ -376,6 +376,8 @@ ggplot(armedpredict, aes(x = h_income, y = predicted)) +
     y = "Predicted Probability"
   )
 ```
+These four graphs depict the model's prediction of whether a victim was armed based on the victims household income and neighborhood characteristics including the poverty rate, unemployment rate and college education rate. The model predictions increase in areas with more poverty and unemployment and but they also decrease in areas with a education and where the victim's household income is higher. 
+
 
 # Additional Questions
 
