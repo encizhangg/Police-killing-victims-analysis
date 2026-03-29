@@ -69,88 +69,6 @@ df <- df |>
 glimpse(df)
 ```
 
-```{r}
-df |>
-  count(cause, armed) |>
-  group_by(cause) |>
-  mutate(percent = n / sum(n)) |>
-  ungroup() |>
-  select(cause, armed, percent) |>
-  pivot_wider(
-    names_from = armed,
-    values_from = percent,
-    values_fill = 0
-  ) |>
-  gt() |>
-  cols_label(
-    cause = "Cause",
-    No = "Unarmed",
-    Yes = "Armed"
-  ) |>
-  fmt_percent(columns = c(No, Yes), decimals = 1) |>
-  tab_header(
-    title = "Police killings by cause and armed status",
-    subtitle = "Percent within each cause"
-  )
-```
-
-
-```{r}
-df |>
-  count(cause, armed) |>
-  group_by(cause) |>
-  mutate(percent = n / sum(n)) |>
-  pivot_wider(
-    names_from = armed,
-    values_from = percent,
-    values_fill = 0,
-
-  ) |>
-  gt() |>
-    tab_header(
-    title = "Police killings by cause and armed status",
-    subtitle = "Counts of cases by category") |>
-    cols_label(
-        Yes = "Armed",
-        No = "Unarmed"
-    )
-```
-
-
-```{r}
-df |>
-  count(cause, armed) |>
-  pivot_wider(
-    names_from = armed,
-    values_from = n,
-    values_fill = 0,
-
-  ) |>
-  gt() |>
-    tab_header(
-    title = "Police killings by cause and armed status",
-    subtitle = "Counts of cases by category") |>
-    cols_label(
-        Yes = "Armed",
-        No = "Unarmed"
-    )
-```
-
-
-```{r}
-df |> 
-    select(cause, armed) |> 
-    group_by(cause) %>%
-  summarise(
-    group_count = n(),
-    Armed = 
-    mean_charge = mean(charges, na.rm = TRUE),
-    median_charge = median(charges, na.rm = TRUE),
-    .groups = "drop"
-  ) |> 
-    gt()
-```
-
 
 
 # Creator: FIRSTNAME LASTNAME
@@ -273,6 +191,55 @@ ggplot(armedpredict, aes(x = h_income, y = predicted)) +
     y = "Predicted Probability"
   )
 ```
+# Additional Questions
+
+### Q1: How does the cause of death vary across the victims' status of being armed?
+
+```{r}
+df |>
+  count(cause, armed) |>
+  group_by(cause) |>
+  mutate(percent = n / sum(n)) |>
+  ungroup() |>
+  select(cause, armed, percent) |>
+  pivot_wider(
+    names_from = armed,
+    values_from = percent,
+    values_fill = 0
+  ) |>
+  gt() |>
+  cols_label(
+    cause = "Cause",
+    No = "Unarmed",
+    Yes = "Armed"
+  ) |>
+  fmt_percent(columns = c(No, Yes), decimals = 1) |>
+  tab_header(
+    title = "Police killings by cause and armed status",
+    subtitle = "Percent within each cause"
+  )
+
+df |> 
+    select(cause, armed) |> 
+    group_by(cause) %>%
+  summarise(
+    group_count = n(),
+    Armed = 
+    mean_charge = mean(charges, na.rm = TRUE),
+    median_charge = median(charges, na.rm = TRUE),
+    .groups = "drop"
+  ) |> 
+    gt()
+```
+
+### Q2: WRITE_QUESTION_HERE
+
+```{r}
+#
+
+```
+
+
 
 # Follow-up Questions
 
@@ -290,18 +257,7 @@ GIVE WHAT 2 QUESTIONS YOU ATTEMPTED TO INVESTIGATE FURTHER IN COMPLETE SENTENCES
 SHOW AT LEAST 2 TABLES OR FIGURES BELOW THAT EXPLORE ANSWERS FOR THE QUESTIONS YOU ARE INVESTIGATING FURTHER.
 
 ```{r}
-fu2df <- df |>
-  select(age, raceethnicity, pov, urate, h_income) |>
-  na.omit()
-
-fu2df$raceethnicity <- relevel(factor(fu2df$raceethnicity), ref = "White")
-
-ageracemodel <- lm(age ~ raceethnicity + pov + urate + h_income, data = fu2df)
-summary(ageracemodel)
-
-fu2df|>
-  group_by(raceethnicity) |>
-  summarise(mean_age = mean(age), n = n())
+#
 ```
 
 ```{r}
