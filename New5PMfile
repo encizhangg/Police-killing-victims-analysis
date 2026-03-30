@@ -72,11 +72,7 @@ data_dictonary |> gt()
 ## Statement of the Business Problem: 
 Police use of lethal force is a critical public safety and civil rights concern in the United States. This dataset, compiled by FiveThirtyEight(https://github.com/fivethirtyeight/data/tree/master/police-killings), records 467 people killed by police during the first half of 2015 and links each incident to census-tract-level socioeconomic indicators such as household income, poverty rate, unemployment, and races of victims. Our exploratory analysis explores the relationship between economic indicators and incident frequency. We investigates whether how specific law enforcement agencies operate in low-income areas, explores how victim demographics such as age and race intersect with neighborhood poverty, and examine the relationships between socioeconomic factors like unemployment, low education, and low income. Together, these analyses aim to identify which conditions are most strongly connected with police killings and whether those patterns hold across racial groups and geographic locations.
 
-## Data Quality Report for Numerical:
-The dataset contains 14 numerical or numeric convertible features. "pop" (tract population) has no missing values and ranges from 0 to 26,826 with a mean of 4,784. "h_income" (tract median household income) and comp_income (ratio of tract to county income) each have 2 missing values. "h_income" ranges from $10,290 to $142,500 with a mean of $46,627, while "comp_income" ranges from 0.18 to 2.87 with a mean of 0.90, showing that the average incident occurs in a tract earning about 90% of its county's median. "county_income" is fully observed, ranging from $22,545 to $110,292. "p_income" (per capita income) is stored as character but converts cleanly for 465 of 467 rows, ranging from $5,457 to $86,023. "pov" (tract poverty rate) is also stored as character and converts for 465 rows, ranging from 1.1% to 79.2% with a mean of 21.1%. "urate" (unemployment rate) and college (share with a college degree) each have 2 missing values, "urate" ranges from 0.01 to 0.51 (mean 0.12), and college ranges from 0.01 to 0.83 (mean 0.22). The demographic is "share_white", "share_black", and "share_hispanic", are all stored as character and each have 2 values that coerce to NA upon numeric conversion. "county_bucket" has 27 missing values, more than the other variables, suggesting that some tracts could not be mapped to county income quintiles. nat_bucket has 2 missing values. age is stored as character because 4 entries contain "Unknown" rather than a number, the remaining 463 values convert cleanly, ranging from 16 to 87.
 
-## Categorical Features:
-There are six key categorical columns. "gender" has no missing values, with 445 males (95.3%) and 22 females. "raceethnicity" has 6 unique levels: White (236), Black (135), Hispanic/Latino (67), Unknown (15), Asian/Pacific Islander (10), and Native American (4),  the 15 "Unknown" entries bring some limit on race-based analysis slightly. "month" spans January through June, but June has only 2 records, making it a 5 month dataset. "cause" has 5 levels dominated by Gunshot (411 of 467, or 88%), followed by Taser (27), Death in custody (14), Struck by vehicle (12), and Unknown (3). "armed" has 8 levels: Firearm (230), No (102), Knife (68), Other (26), Vehicle (18), Non-lethal firearm (14), Unknown (7), and Disputed (2). "state" covers 47 unique states, led by California (74), Texas (46), and Florida (29).
 
 ## Data Issues and Outline of proposed Handling Techniques: 
 Upon opening, the dataset was largely clean with minimal issues. The key issue identified was the classification of many of the variables, with many variables being classified falsely. For example, age was classified as a character when it should have been an integer and gender was classified as a character when it should have been a factor. In the end, we mutated 12 variables. This included mutating age to an integer, gender to a factor, raceethnicity to a factor, month to a factor, state to a factor, cause to a factor, armed to a factor, share_white to numeric, share_black to numeric, share_hispanic to numeric, p_income to numeric and pov to numeric. More generally, we cleaned the names of the variables, used str_squish and ensured all the NA’s were uniform. Lastly, changed the classification of two variables, armed and cause. For armed, we classified all “No” responses as “No” and all else to “Yes”. In essence, this meant that if a victim was armed with anything at all, then their armed classification would be “Yes”. Similarly, for cause, we classified all “Gunshot” responses as “Gunshot” and all else as “Other”. 
@@ -136,9 +132,33 @@ df <- df |>
 ```{r}
 suppressWarnings(DataExplorer::plot_missing(df))
 ```
+##Data Quality Report
+
+## Data Quality Report for Numerical:
+The dataset contains 14 numerical or numeric convertible features. "pop" (tract population) has no missing values and ranges from 0 to 26,826 with a mean of 4,784. "h_income" (tract median household income) and comp_income (ratio of tract to county income) each have 2 missing values. "h_income" ranges from $10,290 to $142,500 with a mean of $46,627, while "comp_income" ranges from 0.18 to 2.87 with a mean of 0.90, showing that the average incident occurs in a tract earning about 90% of its county's median. "county_income" is fully observed, ranging from $22,545 to $110,292. "p_income" (per capita income) is stored as character but converts cleanly for 465 of 467 rows, ranging from $5,457 to $86,023. "pov" (tract poverty rate) is also stored as character and converts for 465 rows, ranging from 1.1% to 79.2% with a mean of 21.1%. "urate" (unemployment rate) and college (share with a college degree) each have 2 missing values, "urate" ranges from 0.01 to 0.51 (mean 0.12), and college ranges from 0.01 to 0.83 (mean 0.22). The demographic is "share_white", "share_black", and "share_hispanic", are all stored as character and each have 2 values that coerce to NA upon numeric conversion. "county_bucket" has 27 missing values, more than the other variables, suggesting that some tracts could not be mapped to county income quintiles. nat_bucket has 2 missing values. age is stored as character because 4 entries contain "Unknown" rather than a number, the remaining 463 values convert cleanly, ranging from 16 to 87.
+
+## Categorical Features:
+There are six key categorical columns. "gender" has no missing values, with 445 males (95.3%) and 22 females. "raceethnicity" has 6 unique levels: White (236), Black (135), Hispanic/Latino (67), Unknown (15), Asian/Pacific Islander (10), and Native American (4),  the 15 "Unknown" entries bring some limit on race-based analysis slightly. "month" spans January through June, but June has only 2 records, making it a 5 month dataset. "cause" has 5 levels dominated by Gunshot (411 of 467, or 88%), followed by Taser (27), Death in custody (14), Struck by vehicle (12), and Unknown (3). "armed" has 8 levels: Firearm (230), No (102), Knife (68), Other (26), Vehicle (18), Non-lethal firearm (14), Unknown (7), and Disputed (2). "state" covers 47 unique states, led by California (74), Texas (46), and Florida (29).
+
 ```{r}
 glimpse(df)
 ```
+
+```{r}
+str(df)
+```
+
+```{r}
+funModeling::data_integrity(df)
+```
+
+```{r}
+funModeling::plot_num(df)
+```
+
+
+
+
 
 
 # Creator: Jinlong Li
