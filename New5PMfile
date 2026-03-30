@@ -72,6 +72,16 @@ data_dictonary |> gt()
 ## Statement of the Business Problem: 
 Police use of lethal force is a critical public safety and civil rights concern in the United States. This dataset, compiled by FiveThirtyEight(https://github.com/fivethirtyeight/data/tree/master/police-killings), records 467 people killed by police during the first half of 2015 and links each incident to census-tract-level socioeconomic indicators such as household income, poverty rate, unemployment, and races of victims. Our exploratory analysis explores the relationship between economic indicators and incident frequency. We investigates whether how specific law enforcement agencies operate in low-income areas, explores how victim demographics such as age and race intersect with neighborhood poverty, and examine the relationships between socioeconomic factors like unemployment, low education, and low income. Together, these analyses aim to identify which conditions are most strongly connected with police killings and whether those patterns hold across racial groups and geographic locations.
 
+```{r}
+data_issue_tribble <- tribble(
+  ~Variable, ~Issue, ~Strategy,
+  "Armed", "Many values for yes", "Mutate into Yes/No",
+  "Cause", "Many categories for death", "Mutate into Gunshot/Other",
+  "Many (including raceethnicity, month, age etc.", "Not correct variable type", "Mutate to correct variable type"
+)
+data_issue_tribble |> gt()
+
+```
 
 
 ## Data Issues and Outline of proposed Handling Techniques: 
@@ -401,10 +411,10 @@ armedpredict <- armedpredict |>
   mutate(
     armed_yn = ifelse(armed == "No", 0, 1)
   )
-model <- glm(armed_yn ~ college + urate + h_income + pov,
+armedmodel <- glm(armed_yn ~ college + urate + h_income + pov,
              data = armedpredict,
              family = binomial)
-armedpredict$predicted <- predict(model, type = "response")
+armedpredict$predicted <- predict(armedmodel, type = "response")
 
 ggplot(armedpredict, aes(x = pov, y = predicted)) +
   geom_point(alpha = 0.4) +
