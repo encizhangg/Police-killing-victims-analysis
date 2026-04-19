@@ -6,7 +6,7 @@ output: html_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
 library(tidyverse)
 library(janitor)
 library(pROC)
@@ -31,231 +31,43 @@ IN LESS THAN 6 PARAGRAPHS, YOU SHOULD DESCRIBE THE DATA USED TO ANSWER THE QUEST
 
 ## Question 2: Can neighborhood socioeconomic features predict whether a victim was armed?
 
-```{r load-and-clean, include=FALSE}
-df <- read.csv("police_killings.csv") |>
-  clean_names() |>
-  mutate(across(where(is.character), ~ str_squish(.))) |>
-  mutate(across(where(is.character),
-               ~ case_when(
-                 .x %in% c("NA", "N/A", "null", "NULL", "?",
-                            "unknown", "Unknown", "-", " - ", " -", "- ") ~ NA_character_,
-                 TRUE ~ .x
-               ))) |>
-  mutate(
-    age            = as.integer(age),
-    gender         = as.factor(gender),
-    raceethnicity  = as.factor(raceethnicity),
-    month          = as.factor(month),
-    state          = as.factor(state),
-    share_white    = as.numeric(share_white),
-    share_black    = as.numeric(share_black),
-    comp_income    = as.numeric(comp_income),
-    share_hispanic = as.numeric(share_hispanic),
-    p_income       = as.numeric(p_income),
-    pov            = as.numeric(pov),
-    urate          = as.numeric(urate),
-    college        = as.numeric(college)
-  ) |>
-  mutate(
-    armed = case_when(armed == "No" ~ "No", TRUE ~ "Yes"),
-    armed = factor(armed, levels = c("No", "Yes"))
-  )
-```
-
-```{r prep-model-data, include=FALSE}
-armedpredict <- df |>
-  select(armed, college, urate, h_income, pov) |>
-  na.omit() |>
-  mutate(
-    armed    = factor(armed, levels = c("No", "Yes")),
-    armed_yn = ifelse(armed == "No", 0, 1)
-  )
-
-feat_cols <- c("college", "urate", "h_income", "pov")
-```
-
 Before fitting any models, we first fit a simple logistic regression on the original data (without any resampling) to get a preliminary sense of whether any of the four variables showed a meaningful trend. The plots below show the relationship between each variable and the predicted probability of being armed, with a LOESS smooth curve to highlight the overall direction. Higher poverty rates and higher unemployment rates are associated with a slightly higher predicted probability of being armed, while higher household income and higher college attainment are associated with a slightly lower probability. The trends are not dramatic, but they are consistent enough in direction that these variables seemed worth exploring further in a more careful modeling setup.
 
-```{r scatter-smooth-exploration, echo=FALSE, fig.width=10, fig.height=8}
-armedpredict_raw <- df |>
-  select(armed, college, urate, h_income, pov) |>
-  na.omit() |>
-  mutate(armed_yn = ifelse(armed == "No", 0, 1))
-
-raw_model <- glm(armed_yn ~ college + urate + h_income + pov,
-                 data = armedpredict_raw, family = binomial)
-armedpredict_raw$predicted <- predict(raw_model, type = "response")
-
-p1 <- ggplot(armedpredict_raw, aes(x = pov, y = predicted)) +
-  geom_point(alpha = 0.4) +
-  geom_smooth() +
-  labs(title = "Poverty Rate",
-       x = "Poverty Rate", y = "Predicted Probability") +
-  theme_minimal()
-
-p2 <- ggplot(armedpredict_raw, aes(x = college, y = predicted)) +
-  geom_point(alpha = 0.4) +
-  geom_smooth() +
-  labs(title = "College Attainment",
-       x = "College Attainment", y = "Predicted Probability") +
-  theme_minimal()
-
-p3 <- ggplot(armedpredict_raw, aes(x = urate, y = predicted)) +
-  geom_point(alpha = 0.4) +
-  geom_smooth() +
-  labs(title = "Unemployment Rate",
-       x = "Unemployment Rate", y = "Predicted Probability") +
-  theme_minimal()
-
-p4 <- ggplot(armedpredict_raw, aes(x = h_income, y = predicted)) +
-  geom_point(alpha = 0.4) +
-  geom_smooth() +
-  labs(title = "Household Income",
-       x = "Household Income", y = "Predicted Probability") +
-  theme_minimal()
-
-(p1 + p2) / (p3 + p4) +
-  plot_annotation(title = "Predicted Probability of Being Armed vs. Each Socioeconomic Feature")
+```{r plot-scatter, fig.cap="Figure 1: Predicted Probability of Being Armed vs. Each Socioeconomic Feature"}
+knitr::include_graphics("p1.png")
 ```
 
-One issue we ran into right away was that the outcome variable was pretty imbalanced — about 78% of victims were recorded as armed, and only about 22% were not. Training a model on data like this can cause it to just predict "Yes" for almost everything, which is not very useful. To deal with this, we used SMOTE (Synthetic Minority Oversampling Technique) to generate additional synthetic samples for the "not armed" group before training, so both classes were equally represented in the training data. To avoid data leakage we split training data set and test data set. We then fit two models — a logistic regression and a decision tree — both using the same four features.
+One issue we ran into right away was that the outcome variable was pretty imbalanced — about 78% of victims were recorded as armed, and only about 22% were not. Training a model on data like this can cause it to just predict "Yes" for almost everything, which is not very useful. To deal with this, we used SMOTE (Synthetic Minority Oversampling Technique) to generate additional synthetic samples for the "not armed" group before training, so both classes were equally represented in the training data. We then fit two models — a logistic regression and a decision tree — both trained on the SMOTE-balanced data and evaluated on a held-out test set.
 
-```{r smote, include=FALSE}
-set.seed(42)
+The logistic regression model did not perform very well. Its AUC came out to 0.539, which is only slightly above 0.5 — basically just above what you would expect from random guessing. Looking at the ROC curve below, it barely rises above the diagonal, which reflects that the model is struggling to separate the two classes. Its accuracy was 0.484, and sensitivity was only 0.463, meaning the model correctly identified less than half of the armed victims. None of the four predictors were statistically significant, which suggests that these neighborhood-level variables on their own do not carry much signal for predicting whether someone was armed.
 
-smote_recipe <- recipe(armed ~ college + urate + h_income + pov,
-                       data = armedpredict) |>
-  step_smote(armed, over_ratio = 1)
-
-smote_prep  <- prep(smote_recipe, training = armedpredict)
-df_balanced <- bake(smote_prep, new_data = NULL) |>
-  mutate(
-    armed    = factor(armed, levels = c("No", "Yes")),
-    armed_yn = ifelse(armed == "No", 0, 1)
-  )
+```{r plot-roc, fig.cap="Figure 2: ROC Curve for Logistic Regression (AUC = 0.539)"}
+knitr::include_graphics("p2.png")
 ```
 
-```{r fit-logistic, include=FALSE}
-armedmodel <- glm(
-  armed_yn ~ college + urate + h_income + pov,
-  data   = df_balanced,
-  family = binomial
-)
+The decision tree did better, with an AUC of 0.740, an accuracy of 0.684, and a specificity of 0.765. Its variable importance plot shows that household income contributed the most to the splits, followed by poverty rate, college attainment, and unemployment rate. This suggests that income and poverty carry a bit more signal than the other two features. The tree diagram gives a clearer picture of how the model actually makes decisions — starting from the root, it first splits on household income, then works down through combinations of the four variables to classify each observation. This kind of threshold-based structure is more intuitive to interpret than a set of regression coefficients.
 
-armedpredict$predicted_prob  <- predict(
-  armedmodel,
-  newdata = armedpredict[, feat_cols],
-  type    = "response"
-)
-armedpredict$predicted_class <- factor(
-  ifelse(armedpredict$predicted_prob >= 0.5, "Yes", "No"),
-  levels = c("No", "Yes")
-)
-
-conf_mat <- confusionMatrix(
-  data      = armedpredict$predicted_class,
-  reference = armedpredict$armed,
-  positive  = "Yes"
-)
-
-roc_obj <- roc(armedpredict$armed_yn, armedpredict$predicted_prob)
-auc_val <- auc(roc_obj)
+```{r plot-varimp, fig.cap="Figure 3: Variable Importance for Decision Tree"}
+knitr::include_graphics("p3.png")
 ```
 
-The logistic regression model did not perform very well. Its AUC came out to about 0.539, which is only slightly above 0.5 — basically just above what you would expect from random guessing. Looking at the ROC curve below, it barely rises above the diagonal, which reflects that the model is struggling to separate the two classes. The predicted probabilities for all observations fell in a pretty narrow range (roughly 0.45 to 0.65), so the model was not really confident in either direction. None of the four predictors were statistically significant, which suggests that these neighborhood-level variables on their own do not carry much signal for predicting whether someone was armed.
-
-```{r logistic-roc, echo=FALSE, fig.width=7, fig.height=5}
-ggroc(roc_obj, color = "steelblue", size = 1) +
-  geom_abline(slope = 1, intercept = 1, linetype = "dashed", color = "grey50") +
-  annotate("text", x = 0.3, y = 0.2,
-           label = paste0("AUC = ", round(auc_val, 3)),
-           size = 5, color = "steelblue") +
-  labs(
-    title = "ROC Curve - Logistic Regression",
-    x = "Specificity", y = "Sensitivity"
-  ) +
-  theme_minimal()
+```{r plot-tree, fig.cap="Figure 4: Decision Tree Structure for Predicting Armed Status"}
+knitr::include_graphics("p4.png")
 ```
 
-```{r fit-tree, include=FALSE}
-set.seed(42)
+Looking at both models together, the decision tree outperformed logistic regression by a reasonable margin. One likely reason for this is that logistic regression assumes a linear relationship between each predictor and the outcome. If the true relationship is non-linear — for example, if poverty rate only starts to matter above a certain threshold — logistic regression will miss that. A decision tree splits the data based on specific cutoff values and can capture those kinds of threshold effects more naturally. It can also pick up on interactions between variables without us having to specify them explicitly. That said, neither model was particularly convincing overall. The table below summarizes the key metrics for both. It still seems like neighborhood socioeconomic features do not tell us very much about whether an individual victim was armed, and whether someone carries a weapon is probably more connected to personal circumstances or the specific situation at the time rather than what the surrounding neighborhood looks like economically.
 
-tree_model <- rpart(
-  armed ~ college + urate + h_income + pov,
-  data    = df_balanced,
-  method  = "class",
-  control = rpart.control(minsplit = 10, cp = 0.01)
-)
-
-armedpredict$tree_pred <- factor(
-  predict(tree_model,
-          newdata = armedpredict[, feat_cols],
-          type    = "class"),
-  levels = c("No", "Yes")
-)
-
-tree_prob <- predict(tree_model,
-                     newdata = armedpredict[, feat_cols],
-                     type    = "prob")[, "Yes"]
-
-tree_conf <- confusionMatrix(
-  data      = armedpredict$tree_pred,
-  reference = armedpredict$armed,
-  positive  = "Yes"
-)
-
-roc_tree <- roc(armedpredict$armed_yn, tree_prob)
-auc_tree  <- auc(roc_tree)
-```
-
-The decision tree had a higher AUC of 0.740, and its variable importance plot (below) shows that household income and poverty rate contributed the most to the splits, followed by unemployment rate and college attainment. This suggests that among the four features, income and poverty carry a bit more signal than the other two, though the overall predictive ability of the model is still limited. The tree diagram also gives a clearer picture of how the model actually makes decisions — it uses a series of threshold-based splits on these variables to classify each observation, which is more intuitive to interpret than a set of regression coefficients.
-
-```{r var-importance, echo=FALSE, fig.width=7, fig.height=4}
-importance_df <- as.data.frame(tree_model$variable.importance) |>
-  rownames_to_column("Variable") |>
-  rename(Importance = `tree_model$variable.importance`) |>
-  arrange(desc(Importance))
-
-ggplot(importance_df, aes(x = reorder(Variable, Importance),
-                           y = Importance, fill = Variable)) +
-  geom_col(show.legend = FALSE) +
-  coord_flip() +
-  scale_fill_brewer(palette = "Set2") +
-  labs(
-    title = "Variable Importance - Decision Tree",
-    x = "Feature", y = "Importance"
-  ) +
-  theme_minimal()
-```
-
-```{r plot-tree, echo=FALSE, fig.width=10, fig.height=6}
-rpart.plot(
-  tree_model,
-  type          = 4,
-  extra         = 104,
-  box.palette   = c("#d73027", "#1a9850"),
-  fallen.leaves = TRUE,
-  main          = "Decision Tree: Predicting Armed Status"
-)
-```
-
-Looking at both models together, the decision tree outperformed logistic regression by a reasonable margin. One likely reason for this is that logistic regression assumes a linear relationship between each predictor and the log-odds of the outcome. If the true relationship is non-linear — for example, if poverty rate only starts to matter above a certain threshold — logistic regression will miss that. A decision tree, on the other hand, splits the data based on specific cutoff values and can capture those kinds of threshold effects more naturally. It can also pick up on interactions between variables without us having to specify them explicitly, for instance finding that a combination of high poverty and low income together is more informative than either variable alone. That said, neither model was particularly convincing overall. The table below summarizes the key metrics for both. It still seems like neighborhood socioeconomic features do not tell us very much about whether an individual victim was armed, and whether someone carries a weapon is probably more connected to personal circumstances or the specific situation at the time rather than what the surrounding neighborhood looks like economically.
-
-```{r model-comparison, echo=FALSE}
+```{r model-comparison-table}
 comparison <- data.frame(
   Model         = c("Logistic Regression", "Decision Tree"),
-  Training_Data = rep("SMOTE-balanced", 2),
-  Accuracy      = c(round(conf_mat$overall["Accuracy"],  3),
-                    round(tree_conf$overall["Accuracy"], 3)),
-  Sensitivity   = c(round(conf_mat$byClass["Sensitivity"],  3),
-                    round(tree_conf$byClass["Sensitivity"], 3)),
-  Specificity   = c(round(conf_mat$byClass["Specificity"],  3),
-                    round(tree_conf$byClass["Specificity"], 3)),
-  AUC           = c(round(auc_val,  3),
-                    round(auc_tree, 3))
+  Training_Data = c("SMOTE-balanced", "SMOTE-balanced"),
+  Accuracy      = c(0.484, 0.684),
+  Sensitivity   = c(0.463, 0.661),
+  Specificity   = c(0.559, 0.765),
+  AUC           = c(0.539, 0.740)
 )
 
-kable(comparison, caption = "Model Performance Comparison (evaluated on original data)")
+kable(comparison, caption = "Table 1: Model Performance Comparison (evaluated on test set)")
 ```
 
 # CONCLUSION
