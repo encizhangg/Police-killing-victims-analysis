@@ -1,0 +1,397 @@
+---
+title: "Police Killings - Armed Status Prediction"
+author: "Group 14"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+```
+
+## Load Libraries
+
+```{r libraries}
+library(tidyverse)
+library(janitor)
+library(ggplot2)
+library(patchwork)     # Combine plots
+library(pROC)          # AUC / ROC curve
+library(caret)         # Confusion matrix
+library(rpart)         # Decision tree
+library(rpart.plot)    # Decision tree visualization
+library(themis)        # SMOTE for class imbalance
+library(recipes)       # Data preprocessing recipes
+```
+
+---
+
+## 1. Data Loading
+
+```{r load-data}
+df <- read.csv("police_killings.csv")
+```
+
+---
+
+## 2. Data Cleaning
+
+```{r clean-names-and-whitespace}
+df <- df |>
+  clean_names() |>
+  mutate(across(where(is.character), ~ str_squish(.))) |>
+  mutate(across(where(is.character), ~ na_if(.x, "")))
+```
+
+```{r standardize-na}
+df <- df |>
+  mutate(across(where(is.character),
+               ~ case_when(
+                 .x %in% c("NA", "N/A", "null", "NULL", "?",
+                            "unknown", "Unknown", "-", " - ", " -", "- ") ~ NA_character_,
+                 TRUE ~ .x
+               )))
+```
+
+```{r fix-types}
+df <- df |>
+  mutate(
+    age            = as.integer(age),
+    gender         = as.factor(gender),
+    raceethnicity  = as.factor(raceethnicity),
+    month          = as.factor(month),
+    state          = as.factor(state),
+    share_white    = as.numeric(share_white),
+    share_black    = as.numeric(share_black),
+    comp_income    = as.numeric(comp_income),
+    share_hispanic = as.numeric(share_hispanic),
+    p_income       = as.numeric(p_income),
+    pov            = as.numeric(pov),
+    urate          = as.numeric(urate),
+    college        = as.numeric(college)
+  )
+```
+
+```{r recode-armed-cause}
+df <- df |>
+  mutate(
+    armed = case_when(armed == "No" ~ "No", TRUE ~ "Yes"),
+    cause = case_when(cause == "Gunshot" ~ "Gunshot", TRUE ~ "Other")
+  ) |>
+  mutate(
+    cause = as.factor(cause),
+    armed = factor(armed, levels = c("No", "Yes"))
+  )
+```
+
+---
+
+## 3. Prepare Modeling Data
+
+```{r prep-model-data}
+armedpredict <- df |>
+  select(armed, college, urate, h_income, pov) |>
+  na.omit() |>
+  mutate(
+    armed    = factor(armed, levels = c("No", "Yes")),
+    armed_yn = ifelse(armed == "No", 0, 1)
+  )
+
+feat_cols <- c("college", "urate", "h_income", "pov")
+
+cat("Rows used for modeling:", nrow(armedpredict), "\n")
+cat("\nClass distribution (original):\n")
+print(table(armedpredict$armed))
+cat("\nClass ratio (Yes:No):",
+    round(sum(armedpredict$armed == "Yes") / sum(armedpredict$armed == "No"), 2), "\n")
+```
+
+---
+
+## 4. Handling Class Imbalance with SMOTE
+
+The dataset is imbalanced (~78% armed). SMOTE (Synthetic Minority
+Oversampling Technique) generates synthetic samples for the minority
+class ("No") to create a more balanced training set.
+
+```{r smote}
+set.seed(42)
+
+smote_recipe <- recipe(armed ~ college + urate + h_income + pov,
+                       data = armedpredict) |>
+  step_smote(armed, over_ratio = 1)
+
+smote_prep  <- prep(smote_recipe, training = armedpredict)
+df_balanced <- bake(smote_prep, new_data = NULL) |>
+  mutate(
+    armed    = factor(armed, levels = c("No", "Yes")),
+    armed_yn = ifelse(armed == "No", 0, 1)
+  )
+
+cat("Class distribution after SMOTE:\n")
+print(table(df_balanced$armed))
+```
+
+```{r visualize-imbalance, fig.width=7, fig.height=4}
+bind_rows(
+  armedpredict |> count(armed) |> mutate(Dataset = "Original"),
+  df_balanced  |> count(armed) |> mutate(Dataset = "After SMOTE")
+) |>
+  ggplot(aes(x = armed, y = n, fill = armed)) +
+  geom_col(show.legend = FALSE) +
+  geom_text(aes(label = n), vjust = -0.4) +
+  facet_wrap(~ Dataset) +
+  scale_fill_manual(values = c("No" = "#d73027", "Yes" = "#1a9850")) +
+  labs(
+    title = "Class Distribution Before and After SMOTE",
+    x = "Armed", y = "Count"
+  ) +
+  theme_minimal()
+```
+
+---
+
+## 5. Logistic Regression (trained on SMOTE data)
+
+### 5.1 Fit Model
+
+```{r fit-logistic}
+armedmodel <- glm(
+  armed_yn ~ college + urate + h_income + pov,
+  data   = df_balanced,
+  family = binomial
+)
+
+summary(armedmodel)
+```
+
+### 5.2 Evaluate on Original Data
+
+```{r logistic-eval}
+armedpredict$predicted_prob  <- predict(
+  armedmodel,
+  newdata = armedpredict[, feat_cols],
+  type    = "response"
+)
+armedpredict$predicted_class <- factor(
+  ifelse(armedpredict$predicted_prob >= 0.5, "Yes", "No"),
+  levels = c("No", "Yes")
+)
+
+conf_mat <- confusionMatrix(
+  data      = armedpredict$predicted_class,
+  reference = armedpredict$armed,
+  positive  = "Yes"
+)
+print(conf_mat)
+
+roc_obj <- roc(armedpredict$armed_yn, armedpredict$predicted_prob)
+auc_val <- auc(roc_obj)
+cat("\nLogistic Regression AUC:", round(auc_val, 4), "\n")
+```
+
+### 5.3 ROC Curve
+
+```{r logistic-roc}
+ggroc(roc_obj, color = "steelblue", size = 1) +
+  geom_abline(slope = 1, intercept = 1, linetype = "dashed", color = "grey50") +
+  annotate("text", x = 0.3, y = 0.2,
+           label = paste0("AUC = ", round(auc_val, 3)),
+           size = 5, color = "steelblue") +
+  labs(
+    title = "ROC Curve - Logistic Regression (SMOTE)",
+    x = "Specificity", y = "Sensitivity"
+  ) +
+  theme_minimal()
+```
+
+### 5.4 Predicted Probability Plots
+
+```{r logistic-prob-plots, fig.width=10, fig.height=8}
+p1 <- ggplot(armedpredict, aes(x = pov, y = predicted_prob)) +
+  geom_point(alpha = 0.4) + geom_smooth() +
+  labs(title = "Poverty Rate", x = "Poverty Rate", y = "Predicted Probability") +
+  theme_minimal()
+
+p2 <- ggplot(armedpredict, aes(x = college, y = predicted_prob)) +
+  geom_point(alpha = 0.4) + geom_smooth() +
+  labs(title = "College Attainment", x = "College Attainment", y = "Predicted Probability") +
+  theme_minimal()
+
+p3 <- ggplot(armedpredict, aes(x = urate, y = predicted_prob)) +
+  geom_point(alpha = 0.4) + geom_smooth() +
+  labs(title = "Unemployment Rate", x = "Unemployment Rate", y = "Predicted Probability") +
+  theme_minimal()
+
+p4 <- ggplot(armedpredict, aes(x = h_income, y = predicted_prob)) +
+  geom_point(alpha = 0.4) + geom_smooth() +
+  labs(title = "Household Income", x = "Household Income", y = "Predicted Probability") +
+  theme_minimal()
+
+(p1 + p2) / (p3 + p4) +
+  plot_annotation(title = "Predicted Probability Victim Was Armed (Logistic Regression)")
+```
+
+---
+
+## 6. Decision Tree (trained on SMOTE data)
+
+### 6.1 Fit Decision Tree
+
+```{r fit-tree}
+set.seed(42)
+
+tree_model <- rpart(
+  armed ~ college + urate + h_income + pov,
+  data    = df_balanced,
+  method  = "class",
+  control = rpart.control(minsplit = 10, cp = 0.01)
+)
+
+printcp(tree_model)
+```
+
+### 6.2 Visualize the Tree
+
+```{r plot-tree, fig.width=10, fig.height=6}
+rpart.plot(
+  tree_model,
+  type          = 3,
+  extra         = 104,
+  box.palette   = c("#d73027", "#1a9850"),
+  fallen.leaves = TRUE,
+  main          = "Decision Tree: Predicting Armed Status (SMOTE)",
+  cex           = 0.8,
+  split.cex     = 0.9,
+  nn.cex        = 0.8,
+  tweak         = 0.9,
+  faclen        = 0,
+  digits        = 2,
+  ycompress     = FALSE
+)
+```
+
+### 6.3 Variable Importance
+
+```{r var-importance, fig.width=7, fig.height=4}
+importance_df <- as.data.frame(tree_model$variable.importance) |>
+  rownames_to_column("Variable") |>
+  rename(Importance = `tree_model$variable.importance`) |>
+  arrange(desc(Importance))
+
+print(importance_df)
+
+ggplot(importance_df, aes(x = reorder(Variable, Importance),
+                           y = Importance, fill = Variable)) +
+  geom_col(show.legend = FALSE) +
+  coord_flip() +
+  scale_fill_brewer(palette = "Set2") +
+  labs(
+    title = "Variable Importance - Decision Tree",
+    x = "Feature", y = "Importance"
+  ) +
+  theme_minimal()
+```
+
+### 6.4 Evaluate on Original Data
+
+```{r tree-eval}
+armedpredict$tree_pred <- factor(
+  predict(tree_model,
+          newdata = armedpredict[, feat_cols],
+          type    = "class"),
+  levels = c("No", "Yes")
+)
+
+tree_prob <- predict(tree_model,
+                     newdata = armedpredict[, feat_cols],
+                     type    = "prob")[, "Yes"]
+
+tree_conf <- confusionMatrix(
+  data      = armedpredict$tree_pred,
+  reference = armedpredict$armed,
+  positive  = "Yes"
+)
+print(tree_conf)
+
+roc_tree <- roc(armedpredict$armed_yn, tree_prob)
+auc_tree  <- auc(roc_tree)
+cat("\nDecision Tree AUC:", round(auc_tree, 4), "\n")
+```
+
+---
+
+## 7. Model Comparison
+
+```{r model-comparison}
+comparison <- data.frame(
+  Model         = c("Logistic Regression", "Decision Tree"),
+  Training_Data = rep("SMOTE-balanced", 2),
+  Accuracy      = c(
+    round(conf_mat$overall["Accuracy"],      4),
+    round(tree_conf$overall["Accuracy"],     4)
+  ),
+  Sensitivity   = c(
+    round(conf_mat$byClass["Sensitivity"],   4),
+    round(tree_conf$byClass["Sensitivity"],  4)
+  ),
+  Specificity   = c(
+    round(conf_mat$byClass["Specificity"],   4),
+    round(tree_conf$byClass["Specificity"],  4)
+  ),
+  AUC           = c(
+    round(auc_val,  4),
+    round(auc_tree, 4)
+  )
+)
+
+knitr::kable(comparison,
+             caption = "Model Performance Comparison (evaluated on full original data)")
+```
+
+```{r roc-overlay, fig.width=8, fig.height=5}
+ggroc(
+  list(
+    "Logistic Regression" = roc_obj,
+    "Decision Tree"       = roc_tree
+  ),
+  size = 1
+) +
+  geom_abline(slope = 1, intercept = 1, linetype = "dashed", color = "grey50") +
+  scale_color_manual(values = c("steelblue", "darkorange")) +
+  labs(
+    title = "ROC Curve Comparison - Logistic Regression vs Decision Tree",
+    x     = "Specificity",
+    y     = "Sensitivity",
+    color = "Model"
+  ) +
+  theme_minimal()
+```
+
+---
+
+## 8. Interpretation
+
+**Logistic Regression:** None of the four predictors reached statistical
+significance (all p-values > 0.23), and the AUC of 0.539 is only marginally
+above the random baseline of 0.50. The predicted probability plots show
+directionally sensible but practically negligible trends — higher poverty
+and unemployment associate with slightly higher predicted probability of
+being armed, while higher income and college attainment associate with
+slightly lower probability. However, all predictions fall within a narrow
+band (~0.45–0.65), insufficient for meaningful classification.
+
+**Decision Tree:** With an AUC of 0.740, the tree appears to outperform
+logistic regression substantially. However, this result should be interpreted
+with caution: because the model is evaluated on the same data it was
+effectively trained on (the original data is a subset of the SMOTE-augmented
+training set), this figure is likely inflated by overfitting. The deep tree
+structure (27 splits) further suggests the model has memorized patterns in
+the balanced training data that do not generalize.
+
+**Overall:** The consistent finding across both methods is that tract-level
+socioeconomic features carry limited predictive signal for whether a victim
+was armed. Whether a person carries a weapon appears to be driven more by
+individual-level factors — such as age, personal history, or situational
+context — than by the economic characteristics of the neighborhood where
+the incident occurred.
